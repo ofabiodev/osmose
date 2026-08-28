@@ -1,0 +1,56 @@
+name: "🐛 Bug Report"
+description: Report a broken behavior in Osmose.
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened?
+      placeholder: Describe the unexpected behavior and what you were trying to do.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide the smallest set of steps or Go code that reproduces the issue.
+      render: go
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Error output
+      description: Paste the complete relevant error output, logs, or stack trace.
+      render: text
+
+  - type: input
+    id: osmose-version
+    attributes:
+      label: Osmose version
+      placeholder: "v0.1.0"
+
+  - type: input
+    id: go-version
+    attributes:
+      label: Go version
+      placeholder: "go1.27.0"
+
+  - type: input
+    id: operating-system
+    attributes:
+      label: Operating system
+      placeholder: "Windows 11, Ubuntu 24.04, macOS 15"

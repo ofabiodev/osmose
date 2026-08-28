@@ -1,0 +1,49 @@
+name: "✨ Feature Request"
+description: Suggest an improvement for Osmose.
+title: "feat: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem or use case would this solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Describe the feature or behavior you would like to see.
+    validations:
+      required: true
+
+  - type: textarea
+    id: example
+    attributes:
+      label: Example
+      description: Show what the public Go API or user experience could look like.
+      render: go
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - client
+        - gateway
+        - rpc
+        - events
+        - collectors
+        - messages
+        - chats
+        - communities
+        - users
+        - reactions
+        - voice
+        - documentation
+        - tooling
+    validations:
+      required: true
