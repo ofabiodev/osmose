@@ -42,8 +42,11 @@ For an existing checkout:
 git submodule update --init --recursive
 ```
 
-The generated protobuf files are already present, so ordinary SDK users do
-not need the protobuf toolchain.
+`schema/` is a pinned submodule of
+[`osmiumchat/proto`](https://github.com/osmiumchat/proto). Keep it checked out
+when running generation or changing protocol-facing code. The generated
+protobuf files are already present, so ordinary SDK development does not need
+the protobuf toolchain.
 
 ## Useful commands
 
@@ -75,7 +78,14 @@ Never edit these files manually:
 - `proto/*/*.pb.go`;
 - `internal/rpc/wrap_gen.go`.
 
-After updating the schema or generation tools, run:
+After intentionally updating the schema, first move the submodule to the
+desired upstream commit:
+
+```bash
+git submodule update --remote schema
+```
+
+Then regenerate and verify the SDK:
 
 ```bash
 make generate

@@ -40,6 +40,26 @@ bun run docs:dev
 From `docs/`, use `bun run docs:check` to validate the documentation or
 `bun run docs:build` to create a static build.
 
+## Clone the repository
+
+The Osmium protocol schema is included as a pinned Git submodule. Clone
+Osmose recursively when working on the SDK:
+
+```bash
+git clone --recurse-submodules https://github.com/ofabiodev/osmose.git
+cd osmose
+```
+
+For an existing checkout, initialize it with:
+
+```bash
+git submodule update --init --recursive
+```
+
+The generated Go protobuf packages are committed to the repository. The
+submodule is needed when regenerating protocol code, not when using Osmose as
+a dependency.
+
 ## Contributing
 
 Bug reports, improvements, and documentation fixes are welcome. Read

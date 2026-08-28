@@ -43,6 +43,25 @@ Do not expose WebSocket frames, request IDs, protobuf oneofs, locks, or
 internal channels through normal service APIs. Advanced callers may use
 `Client.Raw().Call` and the generated `proto/` packages.
 
+## Clone and schema checkout
+
+The protocol source is a real Git submodule. Clone the repository with it:
+
+```bash
+git clone --recurse-submodules https://github.com/ofabiodev/osmose.git
+```
+
+For an existing checkout, run:
+
+```bash
+git submodule update --init --recursive
+```
+
+`schema/` must remain pinned to the commit recorded by the superproject. Do
+not replace it with copied `.proto` files. Update it intentionally with
+`git submodule update --remote schema`, then regenerate and review the
+generated changes.
+
 ## Protocol and generated files
 
 The checked-in protobuf packages are generated from the pinned `schema/`
