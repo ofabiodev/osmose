@@ -18,8 +18,7 @@
 
 ## Why Osmose?
 
-Osmose is a small, typed Go SDK for creating bots on the Osmium protocol. It
-is not a Discord SDK and does not model Osmium as Discord.
+Osmose is a small, typed Go SDK for creating bots on the Osmium protocol.
 
 The SDK hides WebSocket frames, binary Protocol Buffers, request correlation,
 keepalive, reconnect, and shutdown behind a straightforward client API. The
@@ -343,8 +342,7 @@ Connect → Initialize → Initialized → Authorize → Authorization → Ready
 
 Connection failures are retried with bounded backoff. Pending requests are
 completed when a connection ends, and reconnect performs the handshake again.
-Osmose uses the current Osmium protocol rather than adding a REST layer or
-mapping the protocol to Discord concepts.
+Osmose uses the current Osmium protocol rather than adding a REST layer.
 
 ## Documentation
 
@@ -361,12 +359,6 @@ bun run docs:dev
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution and development
 instructions.
-
-## Releases
-
-Osmose uses [Release Please](https://github.com/googleapis/release-please) and
-Conventional Commits. The [release guide](docs/content/releases.md) explains
-the first release and the automated release flow.
 
 ## License
 

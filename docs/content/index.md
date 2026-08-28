@@ -15,14 +15,12 @@ focused on events and services.
 
 ## Start here
 
-- [Getting started](/getting-started/)
-- [Events](/events/)
-- [Message collectors](/collectors/)
-- [Services](/services/)
-- [Protocol and raw API](/protocol/)
-- [API reference](/api-reference/)
-- [Development](/development/)
-- [Releases](/releases/)
+- [Getting started](getting-started/)
+- [Events](events/)
+- [Message collectors](collectors/)
+- [Services](services/)
+- [Protocol and raw API](protocol/)
+- [API reference](api-reference/)
+- [Development](development/)
 
-Osmose is not a Discord SDK. Its wire models and lifecycle follow Osmium's
-current protocol.
+Its wire models and lifecycle follow Osmium's current protocol.

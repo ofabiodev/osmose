@@ -101,7 +101,7 @@ or dynamic loading to the SDK.
   rate-limit buckets or retry-after metadata; do not invent automatic retries.
 - Add an exported API only after checking that a bot developer needs it and
   that a smaller stable shape is not enough.
-- Do not add a command framework, auto-registration, manifests, or Discord
+- Do not add a command framework, auto-registration, manifests, or platform
   concepts to Osmose; those belong in a bot template above the SDK.
 - Do not add a cache or broad endpoint coverage without a concrete bot use
   case.

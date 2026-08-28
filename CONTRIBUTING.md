@@ -132,18 +132,6 @@ Use a clear description with the problem, the change, and the verification
 performed. Do not claim a real Osmium integration works unless it was tested
 with valid credentials.
 
-## Releases
-
-Releases are managed by Release Please from commits merged into `main`. Use
-Conventional Commits such as `fix: correct member lookup` or
-`feat: add a service`. Release Please opens a release pull request, updates
-`CHANGELOG.md`, and creates the version tag and GitHub Release when that pull
-request is merged.
-
-The first release is bootstrapped manually as described in the
-[release guide](docs/content/releases.md). Do not edit generated changelog
-entries or the release manifest casually.
-
 ## Scope discipline
 
 Prefer the smallest abstraction that removes real developer friction. Do not

@@ -93,5 +93,5 @@ is full, the update is dropped and logged so the client stays responsive.
 the overflow callback short.
 
 For waiting on messages inside a confirmation or form flow, use the typed
-[message collector](/collectors/) instead of managing a temporary handler by
+[message collector](../collectors/) instead of managing a temporary handler by
 hand.

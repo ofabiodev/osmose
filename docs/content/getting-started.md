@@ -76,6 +76,6 @@ reconnect, and shutdown.
 
 ## Next steps
 
-- Read [Events](/events/) to handle messages and interactions.
-- Use [Services](/services/) to send messages and query Osmium.
-- Use [Protocol and raw API](/protocol/) when a service does not cover an endpoint yet.
+- Read [Events](../events/) to handle messages and interactions.
+- Use [Services](../services/) to send messages and query Osmium.
+- Use [Protocol and raw API](../protocol/) when a service does not cover an endpoint yet.

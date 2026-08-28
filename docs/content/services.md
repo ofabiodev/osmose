@@ -108,4 +108,4 @@ updates. An audio/WebRTC transport will only be added when the Osmium protocol
 defines one.
 
 The services expose the bot-facing operations supported by the current Osmium
-protocol. Use the [raw API](/protocol/) when an operation is not wrapped yet.
+protocol. Use the [raw API](../protocol/) when an operation is not wrapped yet.
