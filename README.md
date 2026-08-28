@@ -7,6 +7,7 @@
 
 <p align="center">
   <a href="https://github.com/ofabiodev/osmose/actions/workflows/ci_test.yml" rel="nofollow"><img alt="CI" src="https://github.com/ofabiodev/osmose/actions/workflows/ci_test.yml/badge.svg"></a>
+  <a href="https://github.com/ofabiodev/osmose/releases/latest" rel="nofollow"><img alt="Latest release" src="https://img.shields.io/github/v/release/ofabiodev/osmose"></a>
   <a href="https://opensource.org/licenses/MIT" rel="nofollow"><img alt="License" src="https://img.shields.io/badge/license-MIT-brightgreen"></a>
   <a href="https://pkg.go.dev/github.com/ofabiodev/osmose" rel="nofollow"><img alt="Go Reference" src="https://pkg.go.dev/badge/github.com/ofabiodev/osmose.svg"></a>
 </p>
