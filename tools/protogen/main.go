@@ -113,5 +113,20 @@ func format(path string) error {
 	if err := command.Run(); err != nil {
 		return fmt.Errorf("gofmt %s: %w", path, err)
 	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read generated file %s: %w", path, err)
+	}
+	lines := strings.Split(string(data), "\n")
+	filtered := lines[:0]
+	for _, line := range lines {
+		if !strings.HasPrefix(line, "// \tprotoc ") {
+			filtered = append(filtered, line)
+		}
+	}
+	if err := os.WriteFile(path, []byte(strings.Join(filtered, "\n")), 0o644); err != nil {
+		return fmt.Errorf("write generated file %s: %w", path, err)
+	}
 	return nil
 }
