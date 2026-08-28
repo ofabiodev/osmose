@@ -6,8 +6,8 @@ order: 3
 layout: doc
 ---
 
-Osmose uses Osmium's current RPC-over-WebSocket protocol. It does not add a
-REST layer or translate the protocol into Discord concepts.
+Osmose uses Osmium's current RPC-over-WebSocket protocol without adding a REST
+layer.
 
 ## Connection flow
 
