@@ -35,6 +35,25 @@ go get github.com/ofabiodev/osmose
 Generated protocol packages are included, so installing Osmose does not
 require `protoc`.
 
+## Development checkout
+
+Clone the repository with its pinned Osmium protocol schema:
+
+```bash
+git clone --recurse-submodules https://github.com/ofabiodev/osmose.git
+cd osmose
+```
+
+If the repository was cloned without submodules, initialize the schema with:
+
+```bash
+git submodule update --init --recursive
+```
+
+The schema submodule is used to regenerate protocol code. The generated Go
+packages are committed to this repository, so installing Osmose does not
+require the protobuf toolchain.
+
 <table>
   <tr>
     <td>
