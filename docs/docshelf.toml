@@ -1,0 +1,84 @@
+[site]
+name = "Osmose"
+tagline = "A fast and idiomatic Go SDK for building bots on the Osmium protocol."
+description = "A fast and idiomatic Go SDK for building bots on the Osmium protocol."
+url = "https://ofabiodev.github.io/osmose"
+
+[branding]
+title = "Osmose"
+icon = "notebook"
+logo_alt = "Osmose"
+subtitle = "Osmium bots in Go"
+
+[icons]
+enabled = true
+library = "phosphor"
+weight = "regular"
+
+[theme]
+default = "system"
+respect_system = true
+allow_toggle = true
+
+[ui]
+search = true
+theme_toggle = true
+footer = true
+sidebar_footer = true
+
+[navigation]
+sidebar = true
+sidebar_mode = "auto"
+toc = true
+breadcrumbs = true
+page_navigation = true
+edit_link = false
+last_updated = false
+
+[markdown]
+syntax_highlighting = true
+line_numbers = false
+heading_anchors = true
+smart_typography = false
+
+[search]
+enabled = true
+provider = "local"
+include_code = false
+index = "search-index.json"
+
+[paths]
+docs = "content"
+output = "dist"
+base = ""
+custom_css = "custom.css"
+
+[links]
+github = "https://github.com/ofabiodev/osmose"
+edit = ""
+
+[i18n]
+enabled = false
+default_locale = "en"
+locales = ["en"]
+
+[seo]
+title_template = "%s · Osmose"
+description = "Documentation for the idiomatic Go SDK for Osmium bots."
+author = "ofabiodev"
+image = ""
+twitter_card = "summary_large_image"
+robots = "index,follow"
+canonical = true
+json_ld = true
+generate_og_image = true
+
+[feeds]
+sitemap = true
+rss = true
+
+[validation]
+broken_links = "error"
+missing_assets = "error"
+frontmatter = "error"
+unknown_components = "warning"

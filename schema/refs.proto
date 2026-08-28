@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package osmium.client.refs;
+
+// TODO: This is only meant to be used for input. Current use is ambiguous.
+message ChatRef {
+  oneof ref {
+    UserRef user = 1;
+    ChannelRef channel = 2;
+    GroupRef group = 3;
+    RefSelf self = 4;
+  }
+}
+
+message UserRef {
+  // @snowflake<User>
+  fixed64 user_id = 1;
+}
+
+message RefSelf {}
+
+message ChannelRef {
+  // @snowflake<Community>
+  fixed64 community_id = 1;
+  // @snowflake<Channel>
+  fixed64 channel_id = 2;
+}
+
+message GroupRef {
+  // @snowflake<Chat>
+  fixed64 group_id = 1;
+}
+
+message StickerPackRef {
+  // @snowflake<StickerPack>
+  fixed64 id = 1;
+  // TODO auth
+}

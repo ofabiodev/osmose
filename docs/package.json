@@ -1,0 +1,14 @@
+{
+  "name": "osmose-docs",
+  "private": true,
+  "packageManager": "bun@1.3.13",
+  "scripts": {
+    "docs:dev": "docshelf dev",
+    "docs:build": "docshelf build",
+    "docs:check": "docshelf check",
+    "docs:preview": "docshelf preview"
+  },
+  "devDependencies": {
+    "docshelf": "1.0.1"
+  }
+}

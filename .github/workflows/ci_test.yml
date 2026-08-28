@@ -1,0 +1,88 @@
+name: "🧪 CI — Go"
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci_test:
+    runs-on: ubuntu-latest
+    name: 🧪 Go checks
+    steps:
+      - name: "➕ Actions - Checkout"
+        uses: actions/checkout@v6
+        with:
+          submodules: recursive
+
+      - name: "🐹 Actions - Setup Go"
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: "📦 Install Protocol Buffers"
+        run: sudo apt-get update && sudo apt-get install --yes protobuf-compiler
+
+      - name: "🧬 Install Go protobuf generator"
+        run: go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
+
+      - name: "🛠️ Add Go tools to PATH"
+        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: "✅ Run Go checks"
+        run: make check
+
+      - name: "🔍 Verify generated files"
+        run: git diff --exit-code -- proto internal/rpc/wrap_gen.go
+
+      - name: "🏗️ Build Go packages"
+        run: make build
+
+  ci_docs:
+    runs-on: ubuntu-latest
+    name: 📚 Documentation checks
+    steps:
+      - name: "➕ Actions - Checkout"
+        uses: actions/checkout@v6
+
+      - name: "🟢 Actions - Setup Node.js"
+        uses: actions/setup-node@v6
+        with:
+          node-version: "lts/*"
+
+      - name: "🥟 Actions - Setup Bun"
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: "💾 Cache Documentation Dependencies"
+        uses: actions/cache@v5
+        with:
+          path: ~/.bun
+          key: bun-linux-${{ hashFiles('docs/package.json', 'docs/bun.lock') }}
+          restore-keys: bun-linux-
+
+      - name: "📦 Installing Documentation Dependencies"
+        working-directory: docs
+        run: bun ci
+
+      - name: "✅ Validate Documentation"
+        working-directory: docs
+        run: bun run docs:check
+
+      - name: "🏗️ Build Documentation"
+        working-directory: docs
+        run: bun run docs:build

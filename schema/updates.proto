@@ -1,0 +1,206 @@
+syntax = "proto3";
+
+package osmium.client.updates;
+
+import "types.proto";
+import "refs.proto";
+import "chats.proto";
+import "voice.proto";
+import "reactions.proto";
+
+message Update {
+  oneof update {
+    UpdateMessageCreated          message_created                  = 1;
+    UpdateChannel                 channel                          = 2;
+    UpdateMessageDeleted          message_deleted                  = 3;
+    UpdateUserStatus              user_status                      = 4 [deprecated = true];
+    UpdateUser                    user                             = 5;
+    UpdateCommunity               community                        = 6;
+    UpdateChannelDeleted          channel_deleted                  = 7;
+    UpdateMessage                 message                          = 8;
+    UpdateChatTyping              chat_typing                      = 9;
+    UpdateCommunityMember         community_member                 = 10;
+    UpdateCommunityDeleted        community_deleted                = 11;
+    UpdateConversationPermissions conversation_permissions         = 12;
+    UpdateChat                    chat                             = 13;
+    UpdateSessionDeleted          session_deleted                  = 14;
+    UpdateCommunityUnavailable    community_unavailable            = 15;
+    UpdateMemberList              member_list                      = 16;
+    UpdateCommunityMemberDeleted  community_member_deleted         = 17;
+    UpdateUserRelationship        update_user_relationship         = 18;
+    UpdateUserRelationshipDeleted update_user_relationship_deleted = 19;
+    UpdateGroup                   group                            = 20;
+    voice.UpdateRoomState         room_state                       = 21;
+    voice.UpdateRoomParticipant   room_participant                 = 22;
+    UpdateMessageReactions        message_reactions                = 23;
+    UpdateConversationLastRead    conversation_last_read           = 24;
+    UpdateCommunityMemberCreated  community_member_created         = 25;
+    UpdateInteraction             interaction                      = 26;
+    UpdateUserStatusBatch         user_status_batch                = 27;
+  }
+}
+
+message UpdateMessageCreated {
+  osmium.client.types.Message message              = 1;
+  uint32                      channel_unread_count = 2;
+  // The author of the message. Mostly used in communities. Do not assume this
+  // is always present.
+  optional osmium.client.types.User author = 3;
+  optional fixed64 client_id = 4;
+}
+
+message UpdateMessage { osmium.client.types.Message message = 1; }
+
+message UpdateChannel { osmium.client.types.Channel channel = 1; }
+
+message UpdateChannelDeleted { refs.ChannelRef channel = 1; }
+
+message UpdateMessageDeleted {
+  refs.ChatRef chat_ref = 1;
+  // @snowflake<Message>
+  repeated fixed64 message_ids = 2;
+}
+
+message UpdateUserStatus {
+  // @snowflake<User>
+  fixed64                        user_id = 1;
+  osmium.client.types.UserStatus status  = 2;
+}
+
+message UpdateUserStatusBatch {
+  repeated UpdateUserStatus updates = 1;
+}
+
+message UpdateUser {
+  // @snowflake<User>
+  fixed64                  user_id = 1;
+  osmium.client.types.User user    = 2;
+}
+
+message UpdateCommunity {
+  // @snowflake<Community>
+  fixed64                       community_id = 1;
+  osmium.client.types.Community community    = 2;
+}
+
+message UpdateCommunityDeleted {
+  // @snowflake<Community>
+  fixed64 community_id = 1;
+}
+
+message UpdateChatTyping {
+  refs.ChatRef chat_ref = 1;
+  // @snowflake<User>
+  fixed64 user_id = 2;
+  bool    typing  = 3;
+  optional chats.TypingAction action = 4;
+}
+
+message UpdateCommunityMember {
+  // @snowflake<Community>
+  fixed64 community_id = 1;
+  // @snowflake<User>
+  fixed64                             member_id = 2;
+  osmium.client.types.CommunityMember member    = 3;
+}
+
+message UpdateCommunityMemberDeleted {
+  // @snowflake<Community>
+  fixed64 community_id = 1;
+  // @snowflake<User>
+  fixed64 member_id = 2;
+}
+
+message UpdateCommunityMemberCreated {
+  // @snowflake<Community>
+  fixed64 community_id = 1;
+  // @snowflake<User>
+  fixed64                             member_id = 2;
+  optional osmium.client.types.CommunityMember member    = 3;
+  optional osmium.client.types.User user = 4;
+}
+
+message UpdateConversationPermissions {
+  refs.ChatRef              chat_ref    = 1;
+  types.PermissionOverrides permissions = 2;
+}
+
+message UpdateChat { chats.Chat chat = 1; }
+
+message UpdateSessionDeleted {
+  // @snowflake<Session>
+  fixed64 session_id = 1;
+}
+
+message UpdateCommunityUnavailable {
+  // @snowflake<Community>
+  fixed64 community_id = 1;
+}
+
+message UpdateMemberList {
+  // @snowflake<Community>
+  optional fixed64 community_id = 1;
+  // @snowflake<Channel>
+  fixed64 channel_id = 2;
+  // repeated fixed64 member_ids = 3;
+  reserved 3;
+
+  repeated MemberListEntry entries = 4;
+}
+
+message MemberListEntry {
+  oneof entry {
+    MemberListEntryUser    user    = 1;
+    MemberListEntryDivider divider = 2;
+  }
+}
+
+message MemberListEntryUser {
+  types.User      user     = 1;
+  optional string nickname = 2;
+}
+
+message MemberListEntryDivider {
+  oneof inner {
+    bool online = 1;
+    // @snowflake<Role>
+    fixed64 role_id = 2;
+  }
+  uint32 member_count = 3;
+}
+
+message UpdateUserRelationship { types.Relationship relationship = 1; }
+
+message UpdateUserRelationshipDeleted {
+  // @snowflake<User>
+  fixed64 other_user_id = 1;
+}
+
+message UpdateGroup {
+  types.Group         group = 1;
+  repeated types.User users = 2;
+}
+
+message UpdateMessageReactions {
+  refs.ChatRef chat_ref = 1;
+
+  reactions.MessageReactions reactions = 2;
+}
+
+message UpdateConversationLastRead {
+  refs.ChatRef chat_ref = 1;
+  // @snowflake<Message>
+  fixed64 last_read_message_id = 2;
+  optional uint32 unread_count = 3;
+  optional uint32 unread_mentions_count = 4;
+}
+
+message UpdateInteraction {
+  // @snowflake<Interaction>
+  fixed64 interaction_id = 1;
+  // @snowflake<User>
+  fixed64 user_id = 2;
+  // @snowflake<Message>
+  fixed64 message_id = 3;
+  optional string data = 4;
+}

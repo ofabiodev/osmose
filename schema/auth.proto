@@ -1,0 +1,154 @@
+syntax = "proto3";
+
+package osmium.client.auth;
+import "types.proto";
+
+// auth.legacySignIn -> auth.Authorization
+message LegacySignIn {
+  string email = 1;
+  string password = 2;
+  optional string totp = 3;
+}
+
+// auth.signIn -> auth.SignInResult
+message SignIn {
+  string email = 1;
+  string password = 2;
+}
+
+// auth.completeSignIn -> auth.Authorization
+message CompleteSignIn {
+  string challenge_id = 1;
+  oneof proof {
+    string totp = 2;
+    string recovery_code = 3;
+    string webauthn_credential_json = 4;
+  }
+}
+
+message SignInResult {
+  oneof result {
+    Authorization authorization = 1;
+    MfaChallenge mfa_challenge = 2;
+  }
+}
+
+message MfaChallenge {
+  string challenge_id = 1;
+  fixed64 expires_at = 2;
+  bool totp = 3;
+  bool recovery_codes = 4;
+  optional string webauthn_options_json = 5;
+}
+
+// auth.signUp -> auth.Authorization
+message SignUp {
+  optional string email = 1;
+  optional string password = 2;
+  string name = 3;
+  optional string email_verification_token = 4;
+}
+
+// auth.createEmailVerificationChallenge -> auth.EmailVerificationChallenge
+message CreateEmailVerificationChallenge {}
+
+message EmailVerificationChallenge {
+  string nonce = 1;
+  fixed64 expires_at = 2;
+}
+
+// auth.authorize -> auth.Authorization
+message Authorize { string token = 5; }
+
+message Authorization {
+  string token = 1;
+  osmium.client.types.User user = 2;
+  // @snowflake<Session>
+  fixed64 session_id = 3;
+}
+
+// auth.getSessions -> auth.Sessions
+message GetSessions {}
+
+message Sessions {
+  repeated Session sessions = 1;
+  // @snowflake<Session>
+  fixed64 current = 2;
+}
+
+message Session {
+  // @snowflake<Session>
+  fixed64 id = 1;
+  uint32 client_id = 2;
+  string device_type = 3;
+  string device_version = 4;
+  string app_name = 5;
+  string app_version = 6;
+  fixed64 last_active = 7;
+  optional string country = 8;
+  optional string region = 9;
+}
+
+// auth.revokeSessions -> ()
+message RevokeSessions {
+  // @snowflake<Session>
+  repeated fixed64 session_ids = 1;
+}
+
+// auth.resetPassword -> ()
+message ResetPassword {
+  message ResetPasswordConfirm {
+    string code = 1;
+    string new_password = 2;
+  }
+
+  string email = 1;
+  optional ResetPasswordConfirm confirm = 2;
+}
+
+// auth.verifyEmail -> ()
+message VerifyEmail {
+  string email = 1;
+  string code = 2;
+}
+
+// auth.resendEmailVerification -> ()
+message ResendEmailVerification { optional string email = 1; }
+
+// auth.LookupInvite -> auth.InvitePreview
+message LookupInvite { string code = 1; }
+
+// response model for invite creates, for all community/chat/user
+message CreatedInvite { string code = 1; }
+
+enum InviteType {
+  UNKNOWN = 0;
+  COMMUNITY = 1;
+  GROUP = 2;
+  USER = 3;
+}
+
+message InvitePreview {
+  string code = 1;
+  // @snowflake<User>
+  fixed64 creator_id = 2;
+  // @snowflake<Keyable>
+  fixed64 target_id = 3;
+  InviteType target_type = 4;
+  optional fixed64 expires_at = 5;
+
+  optional osmium.client.types.User creator = 6;
+
+  oneof target_info {
+    osmium.client.types.Community community = 7;
+    osmium.client.types.Group chat = 8;
+    osmium.client.types.User user = 9;
+  }
+}
+
+// auth.UseInvite -> ()
+message UseInvite { string code = 1; }
+
+message InviteList {
+  repeated InvitePreview invites = 1;
+}

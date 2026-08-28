@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package osmium.client.users;
+
+import "refs.proto";
+import "types.proto";
+
+// users.getProfile -> Profile
+message GetProfile {
+  refs.UserRef ref = 1;
+  bool include_mutuals = 2;
+}
+
+message Profile {
+  refs.UserRef ref = 1;
+  string bio = 2;
+  optional fixed64 premium_since = 3;
+  optional types.ChatPhoto banner = 4;
+  repeated fixed64 mutual_communities = 5;
+  repeated fixed64 mutual_friends = 6;
+  optional uint64 theme_color = 7;
+  optional bool show_banner_in_voice = 8;
+}
+
+// users.lookupUsername -> UserDetails
+message LookupUsername { string username = 1; }
+message UserDetails { types.User user = 1; }

@@ -1,0 +1,28 @@
+name: "📦 CD — Release Please"
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  cd_release:
+    runs-on: ubuntu-latest
+    name: 📦 Manage release
+    steps:
+      - name: "🚀 Run Release Please"
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

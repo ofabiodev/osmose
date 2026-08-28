@@ -1,0 +1,130 @@
+syntax = "proto3";
+
+package osmium.client.chats;
+
+import "types.proto";
+import "refs.proto";
+import "media.proto";
+
+// chats.getChats -> chats.Chats
+message GetChats {
+  optional uint32 limit = 1;
+  // @snowflake<Chat>
+  optional fixed64 max_id = 2;
+  // @snowflake<Chat>
+  optional fixed64 min_id = 3;
+}
+
+message Chats {
+  repeated types.Conversation chats = 1;
+  repeated types.User users = 2;
+  repeated types.Group groups = 3;
+  repeated types.Channel channels = 4;
+  repeated types.Message messages = 5;
+}
+
+// chats.getChat -> chats.Chat
+message GetChat { refs.ChatRef chat_ref = 1; }
+
+message Chat {
+  types.Conversation chat = 1;
+  optional types.Message message = 2;
+  repeated types.User users = 3;
+  optional types.Group group = 4;
+  optional types.Channel channel = 5;
+}
+
+// chats.getChatMembers -> chats.ChatMembers
+message GetChatMembers { refs.ChatRef chat_ref = 1; }
+
+message ChatMembers {
+  repeated types.ChatMember members = 1;
+  repeated types.User users = 2;
+}
+
+// chats.createChatInvite -> auth.CreatedInvite
+message CreateChatInvite {
+  refs.ChatRef chat_ref = 1;
+  optional fixed64 expires_at = 2;
+  optional uint32 max_uses = 3;
+}
+
+// chats.listChatInvites -> auth.InviteList
+message ListChatInvites {
+  refs.ChatRef chat_ref = 1;
+}
+
+// chats.deleteChatInvite -> ()
+message DeleteChatInvite {
+  string code = 1;
+}
+
+// chats.markChatRead -> ()
+message MarkChatRead {
+  refs.ChatRef chat_ref = 1;
+  // @snowflake<Message>
+  fixed64 message_id = 2;
+  optional uint32 read_amount = 3;
+}
+
+enum TypingAction {
+  TYPING = 0;
+  UPLOAD_IMAGE = 1;
+  UPLOAD_VIDEO = 2;
+  UPLOAD_FILE = 3;
+  RECORDING_AUDIO = 4;
+  RECORDING_VIDEO = 5;
+}
+
+// chats.setTyping -> ()
+message SetTyping {
+  refs.ChatRef chat_ref = 1;
+  bool typing = 2;
+  optional TypingAction action = 3;
+}
+
+// chats.createChat -> types.Group
+message CreateChat {
+  repeated refs.UserRef users = 1;
+  string name = 2;
+}
+
+// chats.editChat -> chats.Chat
+message EditChat {
+  refs.ChatRef chat_ref = 1;
+  optional string name = 2;
+
+  message HighlightedMessage {
+    // @snowflake<Message>
+    optional fixed64 highlighted_msg_id = 1;
+  }
+  // None to not modify, 0 to modify to None, >0 to modify to Some(msg_id)
+  optional HighlightedMessage highlighted_msg_id = 3;
+
+  message Photo {
+    optional media.UploadedFileRef file = 1;
+  }
+  optional Photo photo = 4;
+}
+
+// chats.removeChatMember -> ()
+message RemoveChatMember {
+  refs.ChatRef chat_ref = 1;
+  // @snowflake<User>
+  fixed64 user_id = 2;
+}
+
+// chats.addChatMember -> ()
+message AddChatMember {
+  refs.ChatRef chat_ref = 1;
+  // @snowflake<User>
+  fixed64 user_id = 2;
+}
+
+// chats.editChatMember -> ()
+message EditChatMember {
+  refs.ChatRef chat_ref = 1;
+  // @snowflake<User>
+  fixed64 user_id = 2;
+  fixed64 permissions = 3;
+}
