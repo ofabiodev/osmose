@@ -11,6 +11,10 @@
   <a href="https://opensource.org/licenses/MIT" rel="nofollow"><img alt="License" src="https://img.shields.io/badge/license-MIT-brightgreen"></a>
   <a href="https://pkg.go.dev/github.com/ofabiodev/osmose" rel="nofollow"><img alt="Go Reference" src="https://pkg.go.dev/badge/github.com/ofabiodev/osmose.svg"></a>
 </p>
+<div align="center">
+  <a href="https://osm.pm/c/osmose">▪ Osmium Community ▪</a>
+</div>
+<br/>
 
 ## Why Osmose?
 
