@@ -108,9 +108,9 @@ The rich object operations are:
 
 | Object | Common operations |
 | --- | --- |
-| `Community` | `Channels`, `Members`, `Roles`, `Edit`, `Delete`, `Leave`, `CreateChannel`, `CreateRole`, `AddMember`, `Unban` |
-| `Channel` | `Send`, `Messages`, `History`, `Search`, `PinnedMessages`, `Members`, `Edit`, `Delete`, `CreateInvite` |
-| `Message` | `Reply`, `Edit`, `Delete`, `React`, `Pin`, `Unpin`, `Forward` |
+| `Community` | `Channels`, `Members`, `Roles`, `Edit`, `Delete`, `Leave`, `CreateChannel`, `CreateRole`, `AddMember`, `Unban`, `SetDefaultPermissions` |
+| `Channel` | `Send`, `Messages`, `History`, `Search`, `PinnedMessages`, `Members`, `Edit`, `Delete`, `CreateInvite`, `Invites`, `DeleteInvite` |
+| `Message` | `Reply`, `ReplyWith`, `Edit`, `EditWith`, `Delete`, `React`, `Unreact`, `Pin`, `Unpin`, `SetPinned`, `Forward` |
 | `Member` | `Edit`, `SetRoles`, `AddRole`, `RemoveRole`, `Ban`, `Kick`, `Send` |
 | `Role` | `Edit`, `Delete`, `SetPermissions`, `AddPermissions`, `RemovePermissions` |
 

@@ -275,6 +275,9 @@ Rich `Community`, `Channel`, `Message`, `Member`, and `Role` objects cover
 common reads and mutations while keeping `Raw` available for protocol features
 that are not wrapped yet. See the [rich object guide](docs/content/services.md#rich-objects).
 
+Reply metadata is available as `message.ReplyInfo`; `message.Reply(ctx, content)`
+is the object operation for sending a reply.
+
 ## Services
 
 | Service       | Operations                                                                                 |
@@ -296,11 +299,13 @@ The `types` package contains the public models shared by services and events:
 | ------------------------------------------------- | -------------------------------------------------------------------- |
 | `types.ID`                                        | Explicit Osmium identifier type                                      |
 | `types.User`                                      | User identity, status, photo, and bot information                    |
-| `types.Message`                                   | Message content, author, chat, replies, media, entities, and buttons |
+| `types.Message`                                   | Message content, author, chat, reply metadata, media, entities, and bot info |
 | `types.ChatRef`                                   | Self, user, group, or community channel reference                    |
 | `types.Conversation`                              | Chat state and read markers                                          |
 | `types.Group`, `types.Channel`, `types.Community` | Conversation and community information                               |
-| `types.CommunityMember`, `types.ChatMember`       | Membership and permissions                                           |
+| `types.CommunityMember`, `types.CommunityRole`    | Community membership, roles, and permissions                         |
+| `types.ChatMember`                                | Chat membership and permissions                                      |
+| `types.Emoji`                                     | Unicode or custom reaction emoji                                     |
 | `types.MemberListEntry`, `types.MemberListDivider` | Ordered community-channel member list entries                       |
 | `types.Interaction`                               | Interaction IDs and action data                                      |
 

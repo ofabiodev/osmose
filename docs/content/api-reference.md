@@ -136,7 +136,7 @@ The `types` package contains small models shared by events and services:
 | --- | --- |
 | `types.ID` | Osmium wire ID with an explicit `Uint64()` conversion. |
 | `types.User` | User identity, username, status, photo, bot flag, and raw value. |
-| `types.Message` | Message ID, chat, author, content, reply metadata, media, entities, bot info, and raw value. |
+| `types.Message` | Message ID, chat, author, content, `ReplyInfo`, media, entities, bot info, and raw value. |
 | `types.ChatRef` | Self, user, group, or community channel reference. |
 | `types.ChannelRef` | Community channel reference. |
 | `types.UserRef` | User reference for profile operations. |
