@@ -136,6 +136,13 @@ func (d *eventDispatcher) setClient(client *Client) {
 	d.base = newEventBase(client)
 }
 
+func (d *eventDispatcher) objectClient() *types.ObjectClient {
+	if d == nil || d.client == nil {
+		return nil
+	}
+	return d.client.objectClient
+}
+
 func (d *eventDispatcher) start(parent context.Context) {
 	d.queue.Start(parent)
 }
@@ -426,6 +433,7 @@ func (d *eventDispatcher) dispatch(ctx context.Context, update *updates.Update) 
 		voiceParticipant = append([]listener[VoiceRoomParticipantHandler](nil), d.voiceParticipant...)
 	}
 	d.mu.RUnlock()
+	objectClient := d.objectClient()
 
 	for _, item := range generic {
 		event := &UpdateEvent{Base: d.base, Raw: update}
@@ -434,7 +442,7 @@ func (d *eventDispatcher) dispatch(ctx context.Context, update *updates.Update) 
 	switch value := update.GetUpdate().(type) {
 	case *updates.Update_MessageCreated:
 		author := types.UserFromProto(value.MessageCreated.GetAuthor())
-		message := types.MessageFromProto(value.MessageCreated.GetMessage())
+		message := types.MessageFromProto(value.MessageCreated.GetMessage(), objectClient)
 		if message != nil {
 			message.Author = author
 		}
@@ -443,7 +451,7 @@ func (d *eventDispatcher) dispatch(ctx context.Context, update *updates.Update) 
 			d.call("message_create", ctx, func(ctx context.Context) error { return item.fn(ctx, event) })
 		}
 	case *updates.Update_Message:
-		event := &MessageUpdateEvent{Base: d.base, Message: types.MessageFromProto(value.Message.GetMessage())}
+		event := &MessageUpdateEvent{Base: d.base, Message: types.MessageFromProto(value.Message.GetMessage(), objectClient)}
 		for _, item := range messageUpdate {
 			d.call("message_update", ctx, func(ctx context.Context) error { return item.fn(ctx, event) })
 		}
@@ -457,12 +465,17 @@ func (d *eventDispatcher) dispatch(ctx context.Context, update *updates.Update) 
 			d.call("message_delete", ctx, func(ctx context.Context) error { return item.fn(ctx, event) })
 		}
 	case *updates.Update_CommunityMemberCreated:
-		event := &MemberCreateEvent{Base: d.base, CommunityID: types.ID(value.CommunityMemberCreated.GetCommunityId()), MemberID: types.ID(value.CommunityMemberCreated.GetMemberId()), Member: types.CommunityMemberFromProto(value.CommunityMemberCreated.GetMember()), User: types.UserFromProto(value.CommunityMemberCreated.GetUser())}
+		member := types.CommunityMemberFromProto(value.CommunityMemberCreated.GetMember(), objectClient)
+		user := types.UserFromProto(value.CommunityMemberCreated.GetUser())
+		if member != nil {
+			member.User = user
+		}
+		event := &MemberCreateEvent{Base: d.base, CommunityID: types.ID(value.CommunityMemberCreated.GetCommunityId()), MemberID: types.ID(value.CommunityMemberCreated.GetMemberId()), Member: member, User: user}
 		for _, item := range memberCreate {
 			d.call("member_create", ctx, func(ctx context.Context) error { return item.fn(ctx, event) })
 		}
 	case *updates.Update_Channel:
-		event := &ChannelUpdateEvent{Base: d.base, Channel: types.ChannelFromProto(value.Channel.GetChannel())}
+		event := &ChannelUpdateEvent{Base: d.base, Channel: types.ChannelFromProto(value.Channel.GetChannel(), objectClient)}
 		for _, item := range channelUpdate {
 			d.call("channel_update", ctx, func(ctx context.Context) error { return item.fn(ctx, event) })
 		}
@@ -477,7 +490,7 @@ func (d *eventDispatcher) dispatch(ctx context.Context, update *updates.Update) 
 			d.call("user_update", ctx, func(ctx context.Context) error { return item.fn(ctx, event) })
 		}
 	case *updates.Update_Community:
-		event := &CommunityUpdateEvent{Base: d.base, CommunityID: types.ID(value.Community.GetCommunityId()), Community: types.CommunityFromProto(value.Community.GetCommunity())}
+		event := &CommunityUpdateEvent{Base: d.base, CommunityID: types.ID(value.Community.GetCommunityId()), Community: types.CommunityFromProto(value.Community.GetCommunity(), objectClient)}
 		for _, item := range communityUpdate {
 			d.call("community_update", ctx, func(ctx context.Context) error { return item.fn(ctx, event) })
 		}
@@ -496,7 +509,7 @@ func (d *eventDispatcher) dispatch(ctx context.Context, update *updates.Update) 
 			d.call("chat_typing", ctx, func(ctx context.Context) error { return item.fn(ctx, event) })
 		}
 	case *updates.Update_CommunityMember:
-		event := &MemberUpdateEvent{Base: d.base, CommunityID: types.ID(value.CommunityMember.GetCommunityId()), MemberID: types.ID(value.CommunityMember.GetMemberId()), Member: types.CommunityMemberFromProto(value.CommunityMember.GetMember())}
+		event := &MemberUpdateEvent{Base: d.base, CommunityID: types.ID(value.CommunityMember.GetCommunityId()), MemberID: types.ID(value.CommunityMember.GetMemberId()), Member: types.CommunityMemberFromProto(value.CommunityMember.GetMember(), objectClient)}
 		for _, item := range memberUpdate {
 			d.call("member_update", ctx, func(ctx context.Context) error { return item.fn(ctx, event) })
 		}

@@ -13,11 +13,12 @@ import (
 
 // Service provides community and channel lookups.
 type Service struct {
-	call func(context.Context, proto.Message) (*core.RPCResult, error)
+	call         func(context.Context, proto.Message) (*core.RPCResult, error)
+	objectClient *types.ObjectClient
 }
 
 func New(call func(context.Context, proto.Message) (*core.RPCResult, error)) *Service {
-	return &Service{call: call}
+	return &Service{call: call, objectClient: types.NewObjectClient(call)}
 }
 
 type ListResult struct {
@@ -50,7 +51,7 @@ func (s *Service) List(ctx context.Context) (*ListResult, error) {
 	}
 	response := &ListResult{Raw: value}
 	for _, community := range value.GetCommunities() {
-		response.Communities = append(response.Communities, types.CommunityFromProto(community))
+		response.Communities = append(response.Communities, types.CommunityFromProto(community, s.objectClient))
 	}
 	return response, nil
 }
@@ -72,10 +73,10 @@ func (s *Service) Channels(ctx context.Context, communityID types.ID) (*Channels
 		response.Conversations = append(response.Conversations, types.ConversationFromProto(conversation))
 	}
 	for _, channel := range value.GetChannels() {
-		response.Channels = append(response.Channels, types.ChannelFromProto(channel))
+		response.Channels = append(response.Channels, types.ChannelFromProto(channel, s.objectClient))
 	}
 	for _, message := range value.GetMessages() {
-		response.Messages = append(response.Messages, types.MessageFromProto(message))
+		response.Messages = append(response.Messages, types.MessageFromProto(message, s.objectClient))
 	}
 	return response, nil
 }

@@ -97,7 +97,7 @@ func TestMessageMapsReplyAndBotInfo(t *testing.T) {
 		},
 	}
 	message := MessageFromProto(value)
-	if message == nil || message.Reply == nil || message.Reply.MessageID != 12 || message.Reply.Quote == nil || message.Reply.Quote.Content != "quoted" {
+	if message == nil || message.ReplyInfo == nil || message.ReplyInfo.MessageID != 12 || message.ReplyInfo.Quote == nil || message.ReplyInfo.Quote.Content != "quoted" {
 		t.Fatalf("unexpected reply model: %#v", message)
 	}
 	if message.BotInfo == nil || message.BotInfo.Cloak == nil || message.BotInfo.Cloak.Name != "Helper" || len(message.BotInfo.Buttons) != 1 || message.BotInfo.Buttons[0][0].URL != "https://example.com" {

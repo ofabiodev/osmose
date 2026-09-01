@@ -14,11 +14,12 @@ import (
 
 // Service provides the message operations useful to bots.
 type Service struct {
-	call func(context.Context, proto.Message) (*core.RPCResult, error)
+	call         func(context.Context, proto.Message) (*core.RPCResult, error)
+	objectClient *types.ObjectClient
 }
 
 func New(call func(context.Context, proto.Message) (*core.RPCResult, error)) *Service {
-	return &Service{call: call}
+	return &Service{call: call, objectClient: types.NewObjectClient(call)}
 }
 
 type Button = types.MessageButton
@@ -49,11 +50,7 @@ type SentMessage struct {
 	Raw *protoMessages.SentMessage
 }
 
-type HistoryParams struct {
-	Chat   types.ChatRef
-	Limit  uint32
-	Before types.ID
-}
+type HistoryParams = types.MessageHistoryParams
 
 type History struct {
 	Messages []*types.Message
@@ -65,29 +62,11 @@ type History struct {
 // operation's name for discoverability.
 type SearchResult = History
 
-type SearchParams struct {
-	Chat   types.ChatRef
-	Query  string
-	Scoped bool
-	Since  types.ID
-	Before types.ID
-}
+type SearchParams = types.MessageSearchParams
 
-type EditParams struct {
-	Chat           types.ChatRef
-	MessageID      types.ID
-	Content        *string
-	RemoveMedia    bool
-	Media          []*types.MediaRef
-	Entities       []*types.MessageEntity
-	SuppressEmbeds bool
-	Buttons        *types.MessageButtons
-}
+type EditParams = types.MessageEditParams
 
-type DeleteParams struct {
-	Chat       types.ChatRef
-	MessageIDs []types.ID
-}
+type DeleteParams = types.MessageDeleteParams
 
 func (s *Service) Send(ctx context.Context, params SendParams) (*SentMessage, error) {
 	if params.Content == "" && len(params.Media) == 0 && params.BotInfo == nil {
@@ -173,7 +152,7 @@ func (s *Service) History(ctx context.Context, params HistoryParams) (*History, 
 	if history == nil {
 		return nil, &rpc.UnexpectedResultError{Method: "messages.getHistory"}
 	}
-	return mapHistory(history), nil
+	return mapHistory(history, s.objectClient), nil
 }
 
 // Search finds messages using the protocol's global or chat-scoped search.
@@ -208,7 +187,7 @@ func (s *Service) Search(ctx context.Context, params SearchParams) (*SearchResul
 	if value == nil {
 		return nil, &rpc.UnexpectedResultError{Method: "messages.search"}
 	}
-	return mapHistory(value), nil
+	return mapHistory(value, s.objectClient), nil
 }
 
 // PinnedMessages returns the pinned messages in a chat.
@@ -225,7 +204,7 @@ func (s *Service) PinnedMessages(ctx context.Context, chat types.ChatRef) (*Hist
 	if value == nil {
 		return nil, &rpc.UnexpectedResultError{Method: "messages.getPinnedMessages"}
 	}
-	return mapHistory(value), nil
+	return mapHistory(value, s.objectClient), nil
 }
 
 // UnreadMentions returns the unread mention IDs in a chat.
@@ -307,7 +286,7 @@ func (s *Service) Delete(ctx context.Context, params DeleteParams) error {
 	return rpc.EnsureVoid(result, "messages.deleteMessage")
 }
 
-func mapHistory(value *protoMessages.Messages) *History {
+func mapHistory(value *protoMessages.Messages, client *types.ObjectClient) *History {
 	history := &History{Raw: value}
 	users := make(map[types.ID]*types.User, len(value.GetUsers()))
 	for _, user := range value.GetUsers() {
@@ -318,7 +297,7 @@ func mapHistory(value *protoMessages.Messages) *History {
 		}
 	}
 	for _, message := range value.GetMessages() {
-		model := types.MessageFromProto(message)
+		model := types.MessageFromProto(message, client)
 		if model != nil {
 			model.Author = users[model.AuthorID]
 		}
