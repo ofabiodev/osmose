@@ -33,6 +33,36 @@ func TestListBuildsRequestAndMapsCommunities(t *testing.T) {
 	}
 }
 
+func TestListBindsCommunityObjects(t *testing.T) {
+	var edited *protoCommunities.EditCommunity
+	service := New(func(_ context.Context, request proto.Message) (*core.RPCResult, error) {
+		switch request := request.(type) {
+		case *protoCommunities.GetCommunities:
+			return &core.RPCResult{Result: &core.RPCResult_Communities{Communities: &protoCommunities.Communities{
+				Communities: []*protoTypes.Community{{Id: 7, Name: "Osmium"}},
+			}}}, nil
+		case *protoCommunities.EditCommunity:
+			edited = request
+			return &core.RPCResult{}, nil
+		default:
+			t.Fatalf("unexpected request %T", request)
+			return nil, nil
+		}
+	})
+
+	result, err := service.List(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := "Edited"
+	if err := result.Communities[0].Edit(context.Background(), types.CommunityEditOptions{Name: &name}); err != nil {
+		t.Fatal(err)
+	}
+	if edited == nil || edited.GetCommunityId() != 7 || edited.GetName() != name {
+		t.Fatalf("unexpected bound edit: %#v", edited)
+	}
+}
+
 func TestChannelsBuildsRequestAndMapsMessages(t *testing.T) {
 	var got proto.Message
 	service := New(func(_ context.Context, request proto.Message) (*core.RPCResult, error) {
