@@ -77,6 +77,47 @@ types.GroupChat(groupID)
 types.ChannelChat(communityID, channelID)
 ```
 
+## Rich objects
+
+Community and message models returned by services keep their client reference,
+so common operations can be called directly:
+
+```go
+list, err := client.Communities.List(ctx)
+if err != nil {
+	return err
+}
+
+community := list.Communities[0]
+channels, err := community.Channels(ctx)
+if err != nil {
+	return err
+}
+
+message, err := channels[0].Send(ctx, types.MessageSendParams{Content: "Hello"})
+if err != nil {
+	return err
+}
+
+if err := message.Reply(ctx, "Thanks!"); err != nil {
+	return err
+}
+```
+
+The rich object operations are:
+
+| Object | Common operations |
+| --- | --- |
+| `Community` | `Channels`, `Members`, `Roles`, `Edit`, `Delete`, `Leave`, `CreateChannel`, `CreateRole`, `AddMember`, `Unban` |
+| `Channel` | `Send`, `Messages`, `History`, `Search`, `PinnedMessages`, `Members`, `Edit`, `Delete`, `CreateInvite` |
+| `Message` | `Reply`, `Edit`, `Delete`, `React`, `Pin`, `Unpin`, `Forward` |
+| `Member` | `Edit`, `SetRoles`, `AddRole`, `RemoveRole`, `Ban`, `Kick`, `Send` |
+| `Role` | `Edit`, `Delete`, `SetPermissions`, `AddPermissions`, `RemovePermissions` |
+
+`types.MessageReply` is exposed as `Message.ReplyInfo` because `Message.Reply`
+is now the reply operation. The original protobuf message remains available in
+`Message.Raw`.
+
 ## Users and reactions
 
 ```go

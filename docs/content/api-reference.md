@@ -145,6 +145,8 @@ The `types` package contains small models shared by events and services:
 | `types.Channel` | Community channel metadata. |
 | `types.Community` | Community identity, permissions, and notification preferences. |
 | `types.CommunityMember` | Community membership and roles. |
+| `types.CommunityRole` | Community role metadata and permission operations. |
+| `types.Emoji` | Unicode or custom reaction emoji. |
 | `types.ChatMember` | Chat membership and optional permissions. |
 | `types.MemberListEntry` / `types.MemberListDivider` | Ordered community-channel member-list entries. |
 | `types.Interaction` | Interaction IDs, action data, and the raw update value. |
@@ -168,6 +170,17 @@ types.ChannelChat(communityID, channelID)
 Service responses retain the original generated value in `Raw` where a
 response has a wrapper model. This keeps common code typed while preserving
 access to advanced protocol fields when needed.
+
+## Rich objects
+
+`Community`, `Channel`, `Message`, `CommunityMember` (also named `Member`), and
+`CommunityRole` (also named `Role`) can perform common operations directly.
+Objects returned by `Communities`, `Chats`, `Messages`, and typed events are
+bound to the client automatically. Their methods accept `context.Context` and
+hide request construction; use `Raw` for unsupported protocol operations.
+
+`Message.ReplyInfo` contains reply metadata. It is named `ReplyInfo` because
+`Message.Reply(ctx, content)` is the object reply method.
 
 ## Errors
 

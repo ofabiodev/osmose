@@ -88,18 +88,18 @@ Legend:
 | RPC           |    ✅   | Request correlation, context cancellation, timeouts, typed errors                                 |
 | Events        |   🟡   | Typed events for core bot operations. Some protocol updates require Raw access                    |
 | Collectors    |    ✅   | Message, interaction, and reaction collectors with filters and time limits                        |
-| Messages      |   🟡   | Sending, editing, deleting, history, search, replies, mentions, pinned messages                   |
+| Messages      |   🟡   | Service and rich-object message operations. High-level media upload/download is still missing      |
 | Chats         |   🟡   | Fetching and members support. Chat management operations are not wrapped yet                      |
-| Communities   |   🟡   | Listing, channels, and members lookup. Roles, moderation, permissions, and management are missing |
+| Communities   |   🟡   | Rich community, channel, member, and role operations. Settings and channel overrides remain       |
 | Users         |    ✅   | User fetching and profile access                                                                  |
 | Reactions     |    ✅   | Add and remove reactions                                                                          |
 | Voice         |    ✅   | Voice room control-plane operations                                                               |
 | Media         |   🟠   | Protocol support exists. High-level upload/download API is not available yet                      |
 | Interactions  |   🟡   | Basic interaction events and responses. Advanced components are missing                           |
-| Models        |   🟡   | Typed protocol models. Rich object API is not available yet                                       |
+| Models        |    ✅   | Rich Community, Channel, Message, Member, and Role objects with Raw escape hatches                 |
 | Cache         |    ⚪   | No built-in cache system                                                                          |
 | Managers      |    ⚪   | No object managers yet                                                                            |
-| Permissions   |   🟠   | Protocol support exists. Permission helpers are not wrapped yet                                   |
+| Permissions   |   🟡   | Role and default-permission operations are wrapped; channel overrides remain available through Raw |
 | Builders      |    ⚪   | Message and component builders are planned                                                        |
 | Raw API       |    ✅   | Full protobuf escape hatch for unsupported operations                                             |
 | Safety        |    ✅   | Bounded queues, cancellation, reconnect backoff, concurrency safety                               |
@@ -245,6 +245,35 @@ return event.Reply(ctx, "Pong!")
 
 Common chat references are `types.SelfChat()`, `types.UserChat(id)`,
 `types.GroupChat(id)`, and `types.ChannelChat(communityID, channelID)`.
+
+## Rich objects
+
+Models returned by the community, chat, message, and event APIs keep a private
+reference to the client, so common operations can be written directly on the
+object:
+
+```go
+communities, err := client.Communities.List(ctx)
+if err != nil {
+	return err
+}
+
+channels, err := communities.Communities[0].Channels(ctx)
+if err != nil {
+	return err
+}
+
+message, err := channels[0].Send(ctx, types.MessageSendParams{Content: "Hello"})
+if err != nil {
+	return err
+}
+
+return message.Pin(ctx)
+```
+
+Rich `Community`, `Channel`, `Message`, `Member`, and `Role` objects cover
+common reads and mutations while keeping `Raw` available for protocol features
+that are not wrapped yet. See the [rich object guide](docs/content/services.md#rich-objects).
 
 ## Services
 
