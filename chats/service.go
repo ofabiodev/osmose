@@ -14,11 +14,12 @@ import (
 // Service provides chat lookups and the small set of chat mutations useful to
 // bots.
 type Service struct {
-	call func(context.Context, proto.Message) (*core.RPCResult, error)
+	call         func(context.Context, proto.Message) (*core.RPCResult, error)
+	objectClient *types.ObjectClient
 }
 
 func New(call func(context.Context, proto.Message) (*core.RPCResult, error)) *Service {
-	return &Service{call: call}
+	return &Service{call: call, objectClient: types.NewObjectClient(call)}
 }
 
 type ListParams struct {
@@ -88,10 +89,10 @@ func (s *Service) List(ctx context.Context, params ListParams) (*ListResult, err
 		response.Groups = append(response.Groups, types.GroupFromProto(group))
 	}
 	for _, channel := range value.GetChannels() {
-		response.Channels = append(response.Channels, types.ChannelFromProto(channel))
+		response.Channels = append(response.Channels, types.ChannelFromProto(channel, s.objectClient))
 	}
 	for _, message := range value.GetMessages() {
-		model := types.MessageFromProto(message)
+		model := types.MessageFromProto(message, s.objectClient)
 		if model != nil {
 			model.Author = users[model.AuthorID]
 		}
@@ -115,9 +116,9 @@ func (s *Service) Get(ctx context.Context, ref types.ChatRef) (*Chat, error) {
 	}
 	response := &Chat{
 		Conversation: types.ConversationFromProto(value.GetChat()),
-		Message:      types.MessageFromProto(value.GetMessage()),
+		Message:      types.MessageFromProto(value.GetMessage(), s.objectClient),
 		Group:        types.GroupFromProto(value.GetGroup()),
-		Channel:      types.ChannelFromProto(value.GetChannel()),
+		Channel:      types.ChannelFromProto(value.GetChannel(), s.objectClient),
 		Raw:          value,
 	}
 	users := make(map[types.ID]*types.User, len(value.GetUsers()))

@@ -48,8 +48,9 @@ type Client struct {
 	Reactions   *reactions.Service
 	Voice       *voice.Service
 
-	events *eventDispatcher
-	raw    *RawClient
+	events       *eventDispatcher
+	raw          *RawClient
+	objectClient *types.ObjectClient
 
 	stateMu sync.RWMutex
 	state   State
@@ -110,6 +111,7 @@ func New(config Config) (*Client, error) {
 	c.events.onEventOverflow = config.OnEventOverflow
 	c.events.setClient(c)
 	c.raw = &RawClient{client: c}
+	c.objectClient = types.NewObjectClient(c.call)
 	c.Messages = messages.New(c.call)
 	c.Chats = chats.New(c.call)
 	c.Communities = communities.New(c.call)

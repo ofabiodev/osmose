@@ -137,40 +137,42 @@ func UserFromProto(value *protoTypes.User) *User {
 // Message exposes the fields most bot handlers need without making them
 // understand protobuf's generated field names.
 type Message struct {
-	ID       ID
-	Chat     ChatRef
-	AuthorID ID
-	Author   *User
-	Content  string
-	ReplyTo  ID
-	Media    []*MessageMedia
-	Entities []*MessageEntity
-	Reply    *MessageReply
-	BotInfo  *MessageBotInfo
-	EditedAt uint64
-	Type     MessageType
-	Pinned   bool
-	Raw      *protoTypes.Message
+	ID        ID
+	Chat      ChatRef
+	AuthorID  ID
+	Author    *User
+	Content   string
+	ReplyTo   ID
+	Media     []*MessageMedia
+	Entities  []*MessageEntity
+	ReplyInfo *MessageReply
+	BotInfo   *MessageBotInfo
+	EditedAt  uint64
+	Type      MessageType
+	Pinned    bool
+	Raw       *protoTypes.Message
+	client    *ObjectClient
 }
 
-func MessageFromProto(value *protoTypes.Message) *Message {
+func MessageFromProto(value *protoTypes.Message, clients ...*ObjectClient) *Message {
 	if value == nil {
 		return nil
 	}
 	return &Message{
-		ID:       ID(value.GetMessageId()),
-		Chat:     ChatRefFromProto(value.GetChatRef()),
-		AuthorID: ID(value.GetAuthorId()),
-		Content:  value.GetMessage(),
-		ReplyTo:  ID(value.GetReplyTo()),
-		Media:    cloneMessageMedia(value.GetMedia()),
-		Entities: cloneMessageEntities(value.GetEntities()),
-		Reply:    MessageReplyFromProto(value.GetReply()),
-		BotInfo:  MessageBotInfoFromProto(value.GetBotInfo()),
-		EditedAt: value.GetEditedAt(),
-		Type:     value.GetType(),
-		Pinned:   value.GetPinned(),
-		Raw:      value,
+		ID:        ID(value.GetMessageId()),
+		Chat:      ChatRefFromProto(value.GetChatRef()),
+		AuthorID:  ID(value.GetAuthorId()),
+		Content:   value.GetMessage(),
+		ReplyTo:   ID(value.GetReplyTo()),
+		Media:     cloneMessageMedia(value.GetMedia()),
+		Entities:  cloneMessageEntities(value.GetEntities()),
+		ReplyInfo: MessageReplyFromProto(value.GetReply()),
+		BotInfo:   MessageBotInfoFromProto(value.GetBotInfo()),
+		EditedAt:  value.GetEditedAt(),
+		Type:      value.GetType(),
+		Pinned:    value.GetPinned(),
+		Raw:       value,
+		client:    firstObjectClient(clients...),
 	}
 }
 
@@ -182,7 +184,7 @@ type MessageQuote struct {
 }
 
 // MessageReply contains the richer reply metadata. ReplyTo remains available
-// on Message for compatibility with the deprecated protocol field.
+// on Message for the message ID used by the protocol.
 type MessageReply struct {
 	MessageID ID
 	Quote     *MessageQuote
@@ -536,9 +538,10 @@ type Channel struct {
 	SlowmodeSeconds      *uint32
 	PreferredRegion      *string
 	Raw                  *protoTypes.Channel
+	client               *ObjectClient
 }
 
-func ChannelFromProto(value *protoTypes.Channel) *Channel {
+func ChannelFromProto(value *protoTypes.Channel, clients ...*ObjectClient) *Channel {
 	if value == nil {
 		return nil
 	}
@@ -555,6 +558,7 @@ func ChannelFromProto(value *protoTypes.Channel) *Channel {
 		SlowmodeSeconds:      cloneUint32(value.SlowmodeSeconds),
 		PreferredRegion:      cloneString(value.PreferredRegion),
 		Raw:                  value,
+		client:               firstObjectClient(clients...),
 	}
 }
 
@@ -568,9 +572,10 @@ type Community struct {
 	NotifPrefs  NotifPrefs
 	Username    *string
 	Raw         *protoTypes.Community
+	client      *ObjectClient
 }
 
-func CommunityFromProto(value *protoTypes.Community) *Community {
+func CommunityFromProto(value *protoTypes.Community, clients ...*ObjectClient) *Community {
 	if value == nil {
 		return nil
 	}
@@ -583,6 +588,7 @@ func CommunityFromProto(value *protoTypes.Community) *Community {
 		NotifPrefs:  value.GetNotifPrefs(),
 		Username:    cloneString(value.Username),
 		Raw:         value,
+		client:      firstObjectClient(clients...),
 	}
 }
 
@@ -592,10 +598,12 @@ type CommunityMember struct {
 	CommunityID ID
 	RoleIDs     []ID
 	Nickname    *string
+	User        *User
 	Raw         *protoTypes.CommunityMember
+	client      *ObjectClient
 }
 
-func CommunityMemberFromProto(value *protoTypes.CommunityMember) *CommunityMember {
+func CommunityMemberFromProto(value *protoTypes.CommunityMember, clients ...*ObjectClient) *CommunityMember {
 	if value == nil {
 		return nil
 	}
@@ -605,6 +613,7 @@ func CommunityMemberFromProto(value *protoTypes.CommunityMember) *CommunityMembe
 		RoleIDs:     idsFromUint64(value.GetRoleIds()),
 		Nickname:    cloneString(value.Nickname),
 		Raw:         value,
+		client:      firstObjectClient(clients...),
 	}
 }
 

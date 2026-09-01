@@ -20,10 +20,7 @@ func New(call func(context.Context, proto.Message) (*core.RPCResult, error)) *Se
 	return &Service{call: call}
 }
 
-type Emoji struct {
-	Unicode string
-	Custom  types.ID
-}
+type Emoji = types.Emoji
 
 type Params struct {
 	Chat      types.ChatRef
@@ -39,7 +36,7 @@ func (s *Service) Add(ctx context.Context, params Params) error {
 	if err != nil {
 		return err
 	}
-	emoji, err := params.Emoji.toProto()
+	emoji, err := params.Emoji.ToProto()
 	if err != nil {
 		return err
 	}
@@ -58,7 +55,7 @@ func (s *Service) Remove(ctx context.Context, params Params) error {
 	if err != nil {
 		return err
 	}
-	emoji, err := params.Emoji.toProto()
+	emoji, err := params.Emoji.ToProto()
 	if err != nil {
 		return err
 	}
@@ -67,19 +64,6 @@ func (s *Service) Remove(ctx context.Context, params Params) error {
 		return err
 	}
 	return rpc.EnsureVoid(result, "reactions.removeReaction")
-}
-
-func (e Emoji) toProto() (*protoReactions.ReactionEmoji, error) {
-	if e.Unicode != "" && e.Custom != 0 {
-		return nil, fmt.Errorf("reaction emoji must be unicode or custom")
-	}
-	if e.Unicode != "" {
-		return &protoReactions.ReactionEmoji{Emoji: &protoReactions.ReactionEmoji_UnicodeEmoji{UnicodeEmoji: e.Unicode}}, nil
-	}
-	if e.Custom != 0 {
-		return &protoReactions.ReactionEmoji{Emoji: &protoReactions.ReactionEmoji_CustomEmoji{CustomEmoji: uint64(e.Custom)}}, nil
-	}
-	return nil, fmt.Errorf("reaction emoji is required")
 }
 
 func (s *Service) do(ctx context.Context, request proto.Message) (*core.RPCResult, error) {
