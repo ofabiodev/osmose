@@ -69,22 +69,41 @@ require the protobuf toolchain.
   </tr>
 </table>
 
-## Features
+## Feature Coverage
 
-| Area          | Status | Details                                                                                                      |
-| ------------- | :----: | ------------------------------------------------------------------------------------------------------------ |
-| Client        |   ✅   | Small central client with sensible defaults and typed services                                               |
-| Gateway       |   ✅   | Binary protobuf over WebSocket with controlled reads, writes, and keepalive                                  |
-| Lifecycle     |   ✅   | Connect, initialize, authorize, ready, reconnect, and graceful shutdown                                      |
-| RPC           |   ✅   | Fast request correlation, context cancellation, timeouts, and typed errors                                   |
-| Events        |   ✅   | Strongly typed handlers for connection, messages, users, communities, members, interactions, and voice state |
-| Collectors    |   ✅   | Typed message, interaction, and reaction collectors with filters and bounded lifetimes                       |
-| Messages      |   ✅   | Send, reply, edit, delete, history, search, pinned messages, mentions, media, and buttons                    |
-| Services      |   ✅   | Messages, chats, communities, users, reactions, and voice control-plane operations                           |
-| Models        |   ✅   | Small public models with useful fields and raw protocol access when needed                                   |
-| Raw API       |   ✅   | Generated protobuf escape hatch for endpoints not wrapped by a service                                       |
-| Safety        |   ✅   | Bounded event and write queues, cancellation, reconnect backoff, and race-tested concurrency                 |
-| Documentation |   ✅   | Public documentation site built with [docshelf](https://github.com/ofabiodev/docshelf)                       |
+Legend:
+
+| Status | Meaning                                            |
+| :----: | -------------------------------------------------- |
+|    ✅   | Fully implemented and stable                       |
+|   🟡   | Partially implemented / missing important features |
+|   🟠   | Available through Raw API but not wrapped yet      |
+|    ⚪   | Not implemented yet / planned                      |
+
+| Area          | Status | Details                                                                                           |
+| ------------- | :----: | ------------------------------------------------------------------------------------------------- |
+| Client        |    ✅   | Central client, configuration, lifecycle, typed services                                          |
+| Gateway       |    ✅   | Binary protobuf WebSocket, keepalive, reconnect handling                                          |
+| Lifecycle     |    ✅   | Connect, initialize, authorize, ready, reconnect, shutdown                                        |
+| RPC           |    ✅   | Request correlation, context cancellation, timeouts, typed errors                                 |
+| Events        |   🟡   | Typed events for core bot operations. Some protocol updates require Raw access                    |
+| Collectors    |    ✅   | Message, interaction, and reaction collectors with filters and time limits                        |
+| Messages      |   🟡   | Sending, editing, deleting, history, search, replies, mentions, pinned messages                   |
+| Chats         |   🟡   | Fetching and members support. Chat management operations are not wrapped yet                      |
+| Communities   |   🟡   | Listing, channels, and members lookup. Roles, moderation, permissions, and management are missing |
+| Users         |    ✅   | User fetching and profile access                                                                  |
+| Reactions     |    ✅   | Add and remove reactions                                                                          |
+| Voice         |    ✅   | Voice room control-plane operations                                                               |
+| Media         |   🟠   | Protocol support exists. High-level upload/download API is not available yet                      |
+| Interactions  |   🟡   | Basic interaction events and responses. Advanced components are missing                           |
+| Models        |   🟡   | Typed protocol models. Rich object API is not available yet                                       |
+| Cache         |    ⚪   | No built-in cache system                                                                          |
+| Managers      |    ⚪   | No object managers yet                                                                            |
+| Permissions   |   🟠   | Protocol support exists. Permission helpers are not wrapped yet                                   |
+| Builders      |    ⚪   | Message and component builders are planned                                                        |
+| Raw API       |    ✅   | Full protobuf escape hatch for unsupported operations                                             |
+| Safety        |    ✅   | Bounded queues, cancellation, reconnect backoff, concurrency safety                               |
+| Documentation |    ✅   | Public docs and examples                                                                          |
 
 ## Quick start
 
