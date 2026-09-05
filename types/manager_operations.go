@@ -143,7 +143,7 @@ func (m *ChannelManager) List(ctx context.Context) ([]*Channel, error) {
 	if m == nil {
 		return nil, ErrObjectClientUnavailable
 	}
-	return (&Community{ID: m.scope, client: m.client}).Channels(ctx)
+	return (&Community{ID: m.scope, client: m.client}).listChannels(ctx)
 }
 func (m *ChannelManager) Create(ctx context.Context, options ChannelCreateOptions) error {
 	if m == nil {
@@ -196,13 +196,13 @@ func (m *MemberManager) FetchMany(ctx context.Context, ids ...ID) ([]*Member, er
 			unique = append(unique, id)
 		}
 	}
-	return (&Community{ID: m.scope, client: m.client}).Members(ctx, unique...)
+	return (&Community{ID: m.scope, client: m.client}).listMembers(ctx, unique...)
 }
 func (m *MemberManager) List(ctx context.Context) ([]*Member, error) {
 	if m == nil {
 		return nil, ErrObjectClientUnavailable
 	}
-	return (&Community{ID: m.scope, client: m.client}).Members(ctx)
+	return (&Community{ID: m.scope, client: m.client}).listMembers(ctx)
 }
 
 // Create adds an existing user; no membership is fabricated from a void result.
@@ -241,7 +241,7 @@ func (m *RoleManager) List(ctx context.Context) ([]*Role, error) {
 	if m == nil {
 		return nil, ErrObjectClientUnavailable
 	}
-	return (&Community{ID: m.scope, client: m.client}).Roles(ctx)
+	return (&Community{ID: m.scope, client: m.client}).listRoles(ctx)
 }
 func (m *RoleManager) Create(ctx context.Context, options RoleCreateOptions) error {
 	if m == nil {

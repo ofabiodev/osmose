@@ -7,7 +7,6 @@ import (
 	"os/signal"
 
 	"github.com/ofabiodev/osmose"
-	"github.com/ofabiodev/osmose/messages"
 	"github.com/ofabiodev/osmose/types"
 )
 
@@ -22,29 +21,24 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	// Services require a ready connection. This one-shot example closes after
-	// demonstrating the original service API, which remains supported in v0.3.
+	// Network operations require a ready connection. This one-shot example closes
+	// after demonstrating the manager and object APIs.
 	client.OnReady(func(ctx context.Context, event *osmose.ReadyEvent) error {
 		defer client.Close()
-		sent, err := client.Messages.Send(ctx, messages.SendParams{
-			Chat:    types.SelfChat(),
-			Content: "Hello from Osmose",
-		})
+		messages := client.Managers.Messages.In(types.SelfChat())
+		sent, err := messages.Create(ctx, "Hello from Osmose")
 		if err != nil {
 			return err
 		}
 		log.Printf("sent %d", sent.ID)
 
-		history, err := client.Messages.History(ctx, messages.HistoryParams{
-			Chat:  types.SelfChat(),
-			Limit: 50,
-		})
+		history, err := messages.List(ctx, types.MessageHistoryParams{Limit: 50})
 		if err != nil {
 			return err
 		}
 		log.Printf("received %d messages", len(history.Messages))
 
-		user, err := client.Users.Get(ctx, event.User.Username)
+		user, err := client.Managers.Users.Fetch(ctx, event.User.ID)
 		if err != nil {
 			return err
 		}

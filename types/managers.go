@@ -126,35 +126,44 @@ func (m managerCore) cached() []state.Entry {
 	return entries
 }
 
-// CommunityCollections preserves v0.2 methods such as Community.Members(ctx).
-type CommunityCollections struct {
-	Channels *ChannelManager
-	Members  *MemberManager
-	Roles    *RoleManager
-}
-
-func (c *Community) Collections() CommunityCollections {
+// Channels returns the community's scoped channel manager.
+func (c *Community) Channels() *ChannelManager {
 	var client *ObjectClient
 	var id ID
 	if c != nil {
 		client, id = c.client, c.ID
 	}
-	return CommunityCollections{
-		Channels: &ChannelManager{managerCore{client: client, kind: state.Channel, scope: id}},
-		Members:  &MemberManager{managerCore{client: client, kind: state.Member, scope: id}},
-		Roles:    &RoleManager{managerCore{client: client, kind: state.Role, scope: id}},
-	}
+	return &ChannelManager{managerCore{client: client, kind: state.Channel, scope: id}}
 }
 
-type ChannelCollections struct{ Messages *MessageManager }
+// Members returns the community's scoped member manager.
+func (c *Community) Members() *MemberManager {
+	var client *ObjectClient
+	var id ID
+	if c != nil {
+		client, id = c.client, c.ID
+	}
+	return &MemberManager{managerCore{client: client, kind: state.Member, scope: id}}
+}
 
-func (c *Channel) Collections() ChannelCollections {
+// Roles returns the community's scoped role manager.
+func (c *Community) Roles() *RoleManager {
+	var client *ObjectClient
+	var id ID
+	if c != nil {
+		client, id = c.client, c.ID
+	}
+	return &RoleManager{managerCore{client: client, kind: state.Role, scope: id}}
+}
+
+// Messages returns the channel's scoped message manager.
+func (c *Channel) Messages() *MessageManager {
 	var client *ObjectClient
 	var chat ChatRef
 	if c != nil {
 		client, chat = c.client, ChannelChat(c.CommunityID, c.ID)
 	}
-	return ChannelCollections{Messages: &MessageManager{managerCore{client: client, kind: state.Message, chat: chat}}}
+	return &MessageManager{managerCore{client: client, kind: state.Message, chat: chat}}
 }
 
 // UserManager provides local lookup and explicit network operations.

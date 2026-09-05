@@ -43,7 +43,7 @@ func TestMemberResolveUsesOneTargetedRPCAndFreshFetchBypassesCache(t *testing.T)
 				}
 				return memberResult(10, 20), nil
 			}, CacheConfig{Enabled: enabled})
-			m := c.Managers().Communities.Ref(10).Collections().Members
+			m := c.Managers().Communities.Ref(10).Members()
 			if _, ok := m.Get(20); ok || calls != 0 {
 				t.Fatal("Get performed I/O")
 			}
@@ -219,10 +219,10 @@ func TestCoreManagersFetchAndObjectLifecycle(t *testing.T) {
 	ctx := context.Background()
 	u := c.Managers().Users.Ref(20)
 	community := c.Managers().Communities.Ref(10)
-	channel := community.Collections().Channels.Ref(30)
-	member := community.Collections().Members.Ref(20)
-	role := community.Collections().Roles.Ref(40)
-	message := channel.Collections().Messages.Ref(50)
+	channel := community.Channels().Ref(30)
+	member := community.Members().Ref(20)
+	role := community.Roles().Ref(40)
+	message := channel.Messages().Ref(50)
 	for _, object := range []interface{ Fetch(context.Context) error }{community, u, channel, member, role, message} {
 		if err := object.Fetch(ctx); err != nil {
 			t.Fatal(err)
@@ -237,20 +237,20 @@ func TestCoreManagersFetchAndObjectLifecycle(t *testing.T) {
 	if err := role.AddPermissions(ctx, 16); err != nil {
 		t.Fatal(err)
 	}
-	got, _ := community.Collections().Roles.Get(40)
+	got, _ := community.Roles().Get(40)
 	if got.Permissions != 24 {
 		t.Fatal("role cache missed local edit")
 	}
 	if err := member.Kick(ctx, ""); err != nil {
 		t.Fatalf("valid RemovedMembers rejected: %v", err)
 	}
-	if _, ok := community.Collections().Members.Get(20); ok {
+	if _, ok := community.Members().Get(20); ok {
 		t.Fatal("kick left stale membership")
 	}
 	if err := message.Delete(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := channel.Collections().Messages.Get(50); ok {
+	if _, ok := channel.Messages().Get(50); ok {
 		t.Fatal("delete left stale message")
 	}
 }

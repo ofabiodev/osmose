@@ -69,9 +69,7 @@ Registration returns a function that removes that handler.
 | `OnDisconnected` | `ConnectionEvent` after an attempt ends |
 | `OnReconnecting` | `ConnectionEvent` before a retry, with `RetryIn` |
 | `OnConnectionError` / `OnError` | `ConnectionEvent` with `Err` |
-| `OnMessageCreate` | `MessageCreateEvent` |
 | `OnMessage` | Direct `*types.Message` on create |
-| `OnMessageUpdate` | `MessageUpdateEvent` |
 | `OnMessageEdit` | Direct `*types.Message` on update |
 | `OnMessageDelete` | `MessageDeleteEvent` |
 | `OnChannelUpdate` | `ChannelUpdateEvent` |
@@ -190,13 +188,14 @@ hide request construction; use `Raw` for unsupported protocol operations.
 
 `Client.Managers` provides `UserManager`, `CommunityManager`, `ChannelManager`,
 `MemberManager`, `RoleManager`, and `MessageManager`. Use `In(communityID)` for
-channels/members/roles and `In(chatRef)` for messages. `Community.Collections()`
-and `Channel.Collections()` provide scoped views without changing existing methods.
+channels/members/roles and `In(chatRef)` for messages. Rich objects expose their
+scoped managers through `community.Channels()`, `community.Members()`,
+`community.Roles()`, and `channel.Messages()`.
 
 `Get(id)` returns a cached snapshot and a found flag. `Resolve(ctx, id)` uses a
 complete cache hit, while `Fetch(ctx, id)` always requests fresh data. Network
 operations return errors. `ListCached`, `Invalidate(id)`, and `Clear` perform no
-I/O. See the full [manager operation table](../state-management/#managers-and-collections).
+I/O. See the full [manager operation table](../state-management/#scoped-managers).
 
 `Ref(id)` makes a partial object. All six entity types expose `Partial` and
 `Fetch(ctx) error`; object Fetch refreshes the receiver only on success. Cache

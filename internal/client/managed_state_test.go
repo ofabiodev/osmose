@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ofabiodev/osmose/internal/gateway"
-	"github.com/ofabiodev/osmose/messages"
 	"github.com/ofabiodev/osmose/proto/core"
 	protoMessages "github.com/ofabiodev/osmose/proto/messages"
 	protoTypes "github.com/ofabiodev/osmose/proto/types"
@@ -57,7 +56,7 @@ func TestGatewayStateAppliedEvenWhenEventQueueDrops(t *testing.T) {
 	}
 }
 
-func TestLegacyServiceRawAndRichHandlersShareState(t *testing.T) {
+func TestManagerRawAndRichHandlersShareState(t *testing.T) {
 	socket := newScriptedSocket()
 	c, err := New(Config{Token: "token", ClientID: 1, Cache: types.CacheConfig{Enabled: true}, HeartbeatInterval: time.Hour,
 		dial: func(context.Context, string) (gateway.Socket, error) { return socket, nil }})
@@ -67,13 +66,13 @@ func TestLegacyServiceRawAndRichHandlersShareState(t *testing.T) {
 	cancel, runErr := startReadyClient(t, c)
 	defer stopTestClient(t, c, cancel, runErr)
 	chat := types.ChannelChat(10, 20)
-	sent, err := c.Messages.Send(context.Background(), messages.SendParams{Chat: chat, Content: "legacy"})
+	sent, err := c.Managers.Messages.In(chat).Create(context.Background(), "modern")
 	if err != nil {
 		t.Fatal(err)
 	}
 	cached, ok := c.Managers.Messages.In(chat).Get(sent.ID)
-	if !ok || !cached.Partial || cached.Content != "legacy" {
-		t.Fatal("legacy service did not populate shared cache")
+	if !ok || !cached.Partial || cached.Content != "modern" {
+		t.Fatal("message manager did not populate shared cache")
 	}
 	ref, _ := chat.ToProto()
 	_, err = c.Raw().Call(context.Background(), &protoMessages.SendMessage{ChatRef: ref, Message: "raw"})

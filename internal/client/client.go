@@ -48,7 +48,7 @@ type Client struct {
 	Users       *users.Service
 	Reactions   *reactions.Service
 	Voice       *voice.Service
-	// Managers expose shared state without changing the v0.1/v0.2 services.
+	// Managers are the primary API for stateful rich objects.
 	Managers *types.Managers
 
 	events       *eventDispatcher

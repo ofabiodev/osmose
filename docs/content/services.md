@@ -8,37 +8,33 @@ layout: doc
 
 Services accept `context.Context` and small parameter structs.
 
-Services remain compatible with v0.1/v0.2 and share the client's optional state.
-For cache lookups, direct member resolution, and scoped collections, see
-[managers and state](../state-management/).
+Managers and rich objects are the primary API for stateful community and message
+operations. These services remain for protocol areas that do not have a dedicated
+manager yet, such as chat operations, message search, reactions, and voice.
+For cache lookups and scoped managers, see [managers and state](../state-management/).
 
 ## Messages
 
 ```go
-sent, err := client.Messages.Send(ctx, messages.SendParams{
-	Chat:    types.SelfChat(),
-	Content: "Hello from Osmose",
-})
+sent, err := client.Managers.Messages.In(types.SelfChat()).Create(ctx, "Hello from Osmose")
 if err != nil {
 	return err
 }
 
-history, err := client.Messages.History(ctx, messages.HistoryParams{
-	Chat:  types.SelfChat(),
+history, err := client.Managers.Messages.In(types.SelfChat()).List(ctx, types.MessageHistoryParams{
 	Limit: 50,
 })
 
-matches, err := client.Messages.Search(ctx, messages.SearchParams{
+matches, err := client.Managers.Channels.In(communityID).Ref(channelID).Search(ctx, types.MessageSearchParams{
 	Query: "release",
 })
 ```
 
-`SendParams` also supports protocol media references, entities, reply quotes,
+`MessageSendParams` also supports protocol media references, entities, reply quotes,
 bot identity, and buttons:
 
 ```go
-_, err := client.Messages.Send(ctx, messages.SendParams{
-	Chat:    types.SelfChat(),
+_, err := client.Managers.Messages.In(types.SelfChat()).CreateWith(ctx, types.MessageSendParams{
 	Content: "Choose:",
 	BotInfo: &types.MessageBotInfo{Buttons: types.MessageButtons{{
 		messages.LinkButton("Website", "https://osmium.chat"),
@@ -55,17 +51,16 @@ Available message operations are `Send`, `Reply`, `History`, `Search`,
 ```go
 chat, err := client.Chats.Get(ctx, types.UserChat(userID))
 members, err := client.Chats.Members(ctx, types.GroupChat(groupID))
-communities, err := client.Communities.List(ctx)
-channels, err := client.Communities.Channels(ctx, communityID)
-channelMembers, err := client.Communities.ChannelMembers(ctx, communityID, channelID)
+communities, err := client.Managers.Communities.List(ctx)
+channels, err := client.Managers.Communities.Ref(communityID).Channels().List(ctx)
+channelMembers, err := client.Managers.Channels.In(communityID).Ref(channelID).Members(ctx)
 ```
 
-`Chats.Members` is for private or group chats. Use
-`Communities.ChannelMembers` for the ordered member list of a community
-channel:
+`Chats.Members` is for private or group chats. Use the channel object's
+`Members` method for the ordered member list of a community channel:
 
 ```go
-for _, entry := range channelMembers.Entries {
+for _, entry := range channelMembers {
 	if entry.User != nil {
 		fmt.Println(entry.User.Username, entry.Nickname)
 	}
@@ -87,13 +82,13 @@ Community and message models returned by services keep their client reference,
 so common operations can be called directly:
 
 ```go
-list, err := client.Communities.List(ctx)
+list, err := client.Managers.Communities.List(ctx)
 if err != nil {
 	return err
 }
 
-community := list.Communities[0]
-channels, err := community.Channels(ctx)
+community := list[0]
+channels, err := community.Channels().List(ctx)
 if err != nil {
 	return err
 }
@@ -113,8 +108,8 @@ The rich object operations are:
 | Object | Common operations |
 | --- | --- |
 | `User` | `Fetch` |
-| `Community` | `Fetch`, `Collections`, `Channels`, `Members`, `Roles`, `Edit`, `Delete`, `Leave`, `CreateChannel`, `CreateRole`, `AddMember`, `Unban`, `SetDefaultPermissions` |
-| `Channel` | `Fetch`, `Collections`, `Send`, `SendText`, `Messages`, `History`, `Search`, `PinnedMessages`, `Members`, `Edit`, `Delete`, `CreateInvite`, `Invites`, `DeleteInvite` |
+| `Community` | `Fetch`, `Channels`, `Members`, `Roles`, `Edit`, `Delete`, `Leave`, `CreateChannel`, `CreateRole`, `AddMember`, `Unban`, `SetDefaultPermissions` |
+| `Channel` | `Fetch`, `Messages`, `Send`, `SendText`, `Search`, `PinnedMessages`, `Members`, `Edit`, `Delete`, `CreateInvite`, `Invites`, `DeleteInvite` |
 | `Message` | `Fetch`, `Community`, `Channel`, `Member`, `Reply`, `ReplyWith`, `Edit`, `EditWith`, `Delete`, `React`, `Unreact`, `Pin`, `Unpin`, `SetPinned`, `Forward` |
 | `Member` | `Fetch`, `Edit`, `SetRoles`, `AddRole`, `RemoveRole`, `Ban`, `Kick`, `Delete`, `Send`, `SendText` |
 | `Role` | `Fetch`, `Edit`, `Delete`, `SetPermissions`, `AddPermissions`, `RemovePermissions` |
@@ -126,7 +121,7 @@ is now the reply operation. The original protobuf message remains available in
 ## Users and reactions
 
 ```go
-user, err := client.Users.Get(ctx, "some-user")
+user, err := client.Managers.Users.Lookup(ctx, "some-user")
 profile, err := client.Users.Profile(ctx, types.UserRef{ID: userID})
 
 err = client.Reactions.Add(ctx, reactions.Params{

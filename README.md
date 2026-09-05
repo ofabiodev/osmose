@@ -98,7 +98,7 @@ Legend:
 | Interactions  |   🟡   | Basic interaction events and responses. Advanced components are missing                           |
 | Models        |    ✅   | Client-bound rich objects, partial references, explicit Fetch, and isolated snapshots with Raw     |
 | Cache         |    ✅   | Optional bounded LRU caches, TTL, invalidation, reconnect clearing, and concurrent read coalescing |
-| Managers      |    ✅   | User, community, channel, member, role, and message managers with scoped collections                |
+| Managers      |    ✅   | User, community, channel, member, role, and message managers with scoped accessors                 |
 | Permissions   |   🟡   | Role and default-permission operations are wrapped; channel overrides remain available through Raw |
 | Builders      |    ⚪   | Message and component builders are planned                                                        |
 | Raw API       |    ✅   | Full protobuf escape hatch for unsupported operations                                             |
@@ -117,6 +117,7 @@ import (
 	"os/signal"
 
 	"github.com/ofabiodev/osmose"
+	"github.com/ofabiodev/osmose/types"
 )
 
 func main() {
@@ -136,11 +137,12 @@ func main() {
 		return nil
 	})
 
-	client.OnMessageCreate(func(ctx context.Context, event *osmose.MessageCreateEvent) error {
-		if event.Message.Content != "!ping" {
+	client.OnMessage(func(ctx context.Context, message *types.Message) error {
+		if message.Content != "!ping" {
 			return nil
 		}
-		return event.Reply(ctx, "Pong! 🏓")
+		_, err := message.Reply(ctx, "Pong! 🏓")
+		return err
 	})
 
 	if err := client.Run(ctx); err != nil {
@@ -171,8 +173,8 @@ reconnect, and shutdown for the client.
 Handlers are strongly typed, return an error, and can be removed:
 
 ```go
-remove := client.OnMessageUpdate(func(_ context.Context, event *osmose.MessageUpdateEvent) error {
-	log.Printf("message %d changed", event.Message.ID)
+	remove := client.OnMessageEdit(func(_ context.Context, message *types.Message) error {
+		log.Printf("message %d changed", message.ID)
 	return nil
 })
 defer remove()
@@ -207,7 +209,8 @@ if err != nil {
 	return err
 }
 
-return event.Reply(ctx, "Recebi: "+event.Message.Content)
+	_, err := event.Reply(ctx, "Recebi: "+event.Content)
+	return err
 ```
 
 Use `CollectMessages` when more than one matching message is needed. Message,
@@ -218,18 +221,12 @@ See the [collector guide](docs/content/collectors.md) for a complete form flow.
 
 ## Sending messages
 
-Use parameter structs instead of constructing protobuf requests:
+Use manager methods for common message operations:
 
 ```go
-import (
-	"github.com/ofabiodev/osmose/messages"
-	"github.com/ofabiodev/osmose/types"
-)
+import "github.com/ofabiodev/osmose/types"
 
-sent, err := client.Messages.Send(ctx, messages.SendParams{
-	Chat:    types.SelfChat(),
-	Content: "Choose an action:",
-})
+sent, err := client.Managers.Messages.In(types.SelfChat()).Create(ctx, "Choose an action:")
 if err != nil {
 	return err
 }
@@ -240,7 +237,8 @@ log.Printf("sent message %d", sent.ID)
 Replying to a message event is shorter:
 
 ```go
-return event.Reply(ctx, "Pong!")
+_, err := event.Reply(ctx, "Pong!")
+return err
 ```
 
 Common chat references are `types.SelfChat()`, `types.UserChat(id)`,
@@ -253,12 +251,12 @@ reference to the client, so common operations can be written directly on the
 object:
 
 ```go
-communities, err := client.Communities.List(ctx)
+communities, err := client.Managers.Communities.List(ctx)
 if err != nil {
 	return err
 }
 
-channels, err := communities.Communities[0].Channels(ctx)
+channels, err := communities[0].Channels().List(ctx)
 if err != nil {
 	return err
 }
@@ -285,7 +283,7 @@ configuration. Managers also work with caching disabled.
 
 ```go
 community := client.Managers.Communities.Ref(communityID) // No RPC.
-members := community.Collections().Members
+members := community.Members()
 
 member, err := members.Resolve(ctx, userID) // Cache hit or one targeted RPC.
 if err != nil {
@@ -302,9 +300,9 @@ gateway handler delivery, and is cleared on disconnect. Roles have no dedicated
 gateway event in the current protocol; fetch fresh permissions when required.
 
 Use `client.OnMessage(func(ctx context.Context, message *types.Message) error)`
-for direct rich-message callbacks. Existing services, `OnMessageCreate`, and
-`community.Members(ctx, ids...)` remain supported; collections use an additive
-`Collections()` accessor to avoid conflicting with those methods.
+for created rich messages and `OnMessageEdit` for updated ones. Community and
+channel managers are available through `community.Members()`,
+`community.Channels()`, `community.Roles()`, and `channel.Messages()`.
 
 See [managers and cache behavior](docs/content/state-management.md),
 [member lookup performance](docs/content/member-lookup.md), and the

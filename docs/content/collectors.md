@@ -6,27 +6,28 @@ order: 2
 layout: doc
 ---
 
-Collectors are a small convenience layer over `OnMessageCreate`. They observe
-matching events without preventing other message handlers from running.
+Collectors are a small convenience layer over `OnMessage`. They observe
+matching rich messages without preventing other message handlers from running.
 
 ## Wait for one message
 
 Use `AwaitMessage` for forms, confirmations, and other one-response flows:
 
 ```go
-event, err := client.AwaitMessage(ctx, osmose.MessageCollectorOptions{
+message, err := client.AwaitMessage(ctx, osmose.MessageCollectorOptions{
 	Chat:     chat,
 	AuthorID: userID,
 	Time:     60 * time.Second,
-	Filter: func(event *osmose.MessageCreateEvent) bool {
-		return event.Message.Content != ""
+	Filter: func(message *types.Message) bool {
+		return message.Content != ""
 	},
 })
 if err != nil {
 	return err
 }
 
-return event.Reply(ctx, "Recebi: "+event.Message.Content)
+_, err = message.Reply(ctx, "Recebi: "+message.Content)
+return err
 ```
 
 `AwaitMessage` automatically stops after the first matching message.
@@ -46,8 +47,8 @@ if err != nil {
 }
 defer collector.Stop(osmose.EndReasonStopped)
 
-for event := range collector.Events() {
-	log.Println(event.Message.Content)
+for message := range collector.Events() {
+	log.Println(message.Content)
 }
 
 result := collector.Result()
@@ -55,7 +56,7 @@ log.Println(result.Collected, result.Reason)
 ```
 
 `Events()` is closed when the collector ends. `Done()` can be used when the
-consumer does not need to range over events. `Next(ctx)` waits for one event
+consumer does not need to range over messages. `Next(ctx)` waits for one message
 and respects a separate context. Use `CollectMessagesContext(ctx, options)`
 when a multi-message collector belongs to a request or interaction lifetime.
 
@@ -115,14 +116,11 @@ A form can be composed from `AwaitMessage` calls:
 
 ```go
 func ask(ctx context.Context, client *osmose.Client, chat types.ChatRef, userID types.ID, prompt string) (string, error) {
-	if _, err := client.Messages.Send(ctx, messages.SendParams{
-		Chat:    chat,
-		Content: prompt,
-	}); err != nil {
+	if _, err := client.Managers.Messages.In(chat).Create(ctx, prompt); err != nil {
 		return "", err
 	}
 
-	event, err := client.AwaitMessage(ctx, osmose.MessageCollectorOptions{
+	message, err := client.AwaitMessage(ctx, osmose.MessageCollectorOptions{
 		Chat:     chat,
 		AuthorID: userID,
 		Time:     2 * time.Minute,
@@ -130,7 +128,7 @@ func ask(ctx context.Context, client *osmose.Client, chat types.ChatRef, userID 
 	if err != nil {
 		return "", err
 	}
-	return event.Message.Content, nil
+	return message.Content, nil
 }
 ```
 

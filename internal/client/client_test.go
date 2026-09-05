@@ -175,12 +175,12 @@ func TestClientInitializesAuthorizesAndReplies(t *testing.T) {
 	socket := newScriptedSocket()
 	client := testClient(t, socket)
 	cancel, runErr := startReadyClient(t, client)
-	message := &modelTypes.Message{ID: 1, Chat: modelTypes.SelfChat()}
+	message := client.Managers.Messages.In(modelTypes.SelfChat()).Ref(1)
 	chat, err := message.Chat.ToProto()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := client.Messages.Reply(context.Background(), message, "pong"); err != nil {
+	if _, err := message.Reply(context.Background(), "pong"); err != nil {
 		t.Fatal(err)
 	}
 	requests := socket.snapshot()
@@ -235,12 +235,12 @@ func TestClientUsesProtocolKeepalive(t *testing.T) {
 	}
 }
 
-func TestClientDispatchesTypedMessageEvent(t *testing.T) {
+func TestClientDispatchesRichMessageEvent(t *testing.T) {
 	socket := newScriptedSocket()
 	client := testClient(t, socket)
-	received := make(chan *MessageCreateEvent, 1)
-	client.OnMessageCreate(func(_ context.Context, event *MessageCreateEvent) error {
-		received <- event
+	received := make(chan *modelTypes.Message, 1)
+	client.OnMessage(func(_ context.Context, message *modelTypes.Message) error {
+		received <- message
 		return nil
 	})
 	cancel, runErr := startReadyClient(t, client)
@@ -252,9 +252,9 @@ func TestClientDispatchesTypedMessageEvent(t *testing.T) {
 		t.Fatal(err)
 	}
 	select {
-	case event := <-received:
-		if event.Message == nil || event.Message.Content != content || event.Message.Author == nil || event.Message.Author.ID != 10 || event.Author == nil || event.Author.ID != 10 || event.Client() != client {
-			t.Fatalf("unexpected event: %#v", event)
+	case message := <-received:
+		if message == nil || message.Content != content || message.Author == nil || message.Author.ID != 10 {
+			t.Fatalf("unexpected message: %#v", message)
 		}
 	case <-time.After(time.Second):
 		t.Fatal("message event was not dispatched")
@@ -271,7 +271,7 @@ func TestClientRequestTimeoutRemovesPending(t *testing.T) {
 	socket.mu.Unlock()
 	ctx, timeout := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer timeout()
-	_, err := client.Communities.List(ctx)
+	_, err := client.Managers.Communities.List(ctx)
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("unexpected timeout error: %v", err)
 	}
@@ -291,7 +291,7 @@ func TestClientConvertsRPCError(t *testing.T) {
 	socket.mu.Lock()
 	socket.rpcErr = true
 	socket.mu.Unlock()
-	_, err := client.Communities.List(context.Background())
+	_, err := client.Managers.Communities.List(context.Background())
 	var rpcErr *RPCError
 	if !errors.As(err, &rpcErr) || rpcErr.Code != 403 || rpcErr.Message != "forbidden" {
 		t.Fatalf("unexpected RPC error: %v", err)

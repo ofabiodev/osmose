@@ -6,9 +6,9 @@ order: 4
 layout: doc
 ---
 
-Osmose v0.3 adds six managers backed by one optional client-owned cache. Existing
-services and rich objects use the same state. A lookup never needs a separate
-community fetch just to construct a member or channel reference.
+Osmose v0.3 adds six managers backed by one optional client-owned cache. Rich
+objects and their scoped managers use the same state. A lookup never needs a
+separate community fetch just to construct a member or channel reference.
 
 ## Enable the cache
 
@@ -65,19 +65,19 @@ so its cancellation/error is also returned to callers sharing that request. At
 most 256 distinct reads are tracked; excess distinct reads proceed normally.
 Completed calls are removed immediately, so later `Fetch` calls are fresh.
 
-## Managers and collections
+## Scoped managers
 
 ```go
 community := client.Managers.Communities.Ref(communityID)
-channel := community.Collections().Channels.Ref(channelID)
+channel := community.Channels().Ref(channelID)
 
-member, err := community.Collections().Members.Resolve(ctx, userID)
-role, err := community.Collections().Roles.Fetch(ctx, roleID)
-message, err := channel.Collections().Messages.Fetch(ctx, messageID)
+member, err := community.Members().Resolve(ctx, userID)
+role, err := community.Roles().Fetch(ctx, roleID)
+message, err := channel.Messages().Fetch(ctx, messageID)
 ```
 
 `Ref(id)` constructs a client-bound partial object without any I/O. Scoping with
-`In` or `Collections` also performs no I/O. Members and roles are keyed by community
+`In` or an object manager accessor also performs no I/O. Members and roles are keyed by community
 and ID; messages are keyed by chat and ID. Entries cannot leak between scopes.
 
 | Manager | Access | Operations |
@@ -134,7 +134,8 @@ return sent.Pin(ctx)
 
 `User`, `Community`, `Channel`, `Message`, `Member`, and `Role` expose `Partial` and
 `Fetch(ctx) error`. Fetch replaces the receiver only on success. `Edit` and `Delete`
-retain their existing signatures; `Member.Delete(ctx)` is an alias for kicking.
+operate directly on the bound object; `Member.Delete(ctx)` removes the membership
+without banning the user.
 Deletion evicts the cache entry; an already-held snapshot is not silently erased.
 
 `message.Community()`, `message.Channel()`, and `message.Member()` return a cached
@@ -193,30 +194,16 @@ Slow reads cannot repopulate the cache after a newer event, mutation, or manual
 invalidation. Such calls still return their response to the requesting caller;
 only their cache write is discarded. A client-wide revision conservatively skips
 unrelated cache fills during concurrent updates. Reconnect/shutdown clears cached
-state because Osmium has no replay contract for missed updates. Old references
+state because Osmium has no replay contract for missed updates. Held references
 remain usable, but fetch new permission data after reconnect.
 
 ```go
-community.Collections().Members.Invalidate(userID) // Cache eviction only.
-community.Collections().Roles.Clear()             // This community's roles.
+community.Members().Invalidate(userID) // Cache eviction only.
+community.Roles().Clear()               // This community's roles.
 client.Managers.Clear()                            // All cached entities.
 ```
 
-## Compatibility with v0.1 and v0.2
-
-Existing service calls and `OnMessageCreate(func(ctx, *MessageCreateEvent) error)`
-remain supported. `OnMessage` and `OnMessageEdit` are additive callbacks receiving
-`*types.Message` directly. Context, error hooks, panic recovery, and unsubscribe
-semantics are unchanged. `OnUpdate` remains the raw event escape hatch.
-
-Go cannot have a `Members` field and a `Members` method on the same type. Therefore
-the collection API is `community.Collections().Members`, preserving
-`community.Members(ctx, ids...)`. Likewise, `channel.Collections().Messages`
-preserves `channel.Messages(ctx, params)`. `Send(ctx, MessageSendParams)` stays
-typed; `SendText(ctx, string)` is the new shorthand.
-
-The v0.2 rename from `Message.Reply` metadata to `Message.ReplyInfo` still applies
-when migrating directly from v0.1. v0.3 does not introduce another field rename.
-
-See [member lookup performance](../member-lookup/) for a migration example and
-the reproducible benchmark, and [events](../events/) for the rich callback API.
+The v0.3 surface uses rich handlers and scoped managers as its single public path.
+`OnUpdate` remains the raw event escape hatch. `Send` accepts full message options;
+`SendText` is the short form. See [member lookup performance](../member-lookup/)
+for the reproducible benchmark and [events](../events/) for the handler API.

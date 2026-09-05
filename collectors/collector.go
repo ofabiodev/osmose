@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ofabiodev/osmose/events"
 	"github.com/ofabiodev/osmose/types"
 )
 
@@ -68,7 +67,7 @@ func (e *CollectorError) Unwrap() error {
 type MessageCollectorOptions struct {
 	Chat     types.ChatRef
 	AuthorID types.ID
-	Filter   func(*events.MessageCreateEvent) bool
+	Filter   func(*types.Message) bool
 
 	Time   time.Duration
 	Idle   time.Duration
@@ -104,7 +103,7 @@ type CollectorResult struct {
 // stopped, reaches a limit, or one of its automatic limits fires.
 type MessageCollector struct {
 	options MessageCollectorOptions
-	events  chan *events.MessageCreateEvent
+	events  chan *types.Message
 	done    chan struct{}
 
 	mu             sync.Mutex
@@ -118,7 +117,7 @@ type MessageCollector struct {
 	idleGeneration uint64
 }
 
-func NewMessages(ctx, lifecycleCtx context.Context, options MessageCollectorOptions, register func(func(context.Context, *events.MessageCreateEvent) error) func()) (*MessageCollector, error) {
+func NewMessages(ctx, lifecycleCtx context.Context, options MessageCollectorOptions, register func(func(context.Context, *types.Message) error) func()) (*MessageCollector, error) {
 	if err := options.validate(); err != nil {
 		return nil, err
 	}
@@ -131,7 +130,7 @@ func NewMessages(ctx, lifecycleCtx context.Context, options MessageCollectorOpti
 
 	collector := &MessageCollector{
 		options: options,
-		events:  make(chan *events.MessageCreateEvent, options.Buffer),
+		events:  make(chan *types.Message, options.Buffer),
 		done:    make(chan struct{}),
 	}
 	collector.mu.Lock()
@@ -167,7 +166,7 @@ func NewMessages(ctx, lifecycleCtx context.Context, options MessageCollectorOpti
 }
 
 // Events returns matching messages and closes when the collector ends.
-func (c *MessageCollector) Events() <-chan *events.MessageCreateEvent {
+func (c *MessageCollector) Events() <-chan *types.Message {
 	if c == nil {
 		return nil
 	}
@@ -198,7 +197,7 @@ func (c *MessageCollector) Stop(reason EndReason) {
 }
 
 // Next waits for the next matching event or for the collector/context to end.
-func (c *MessageCollector) Next(ctx context.Context) (*events.MessageCreateEvent, error) {
+func (c *MessageCollector) Next(ctx context.Context) (*types.Message, error) {
 	if c == nil {
 		return nil, ErrCollectorEnded
 	}
@@ -225,21 +224,21 @@ func (c *MessageCollector) Next(ctx context.Context) (*events.MessageCreateEvent
 	}
 }
 
-func (c *MessageCollector) matches(event *events.MessageCreateEvent) bool {
-	if event == nil || event.Message == nil {
+func (c *MessageCollector) matches(message *types.Message) bool {
+	if message == nil {
 		return false
 	}
-	if c.options.Chat != (types.ChatRef{}) && event.Message.Chat != c.options.Chat {
+	if c.options.Chat != (types.ChatRef{}) && message.Chat != c.options.Chat {
 		return false
 	}
-	if c.options.AuthorID != 0 && event.Message.AuthorID != c.options.AuthorID {
+	if c.options.AuthorID != 0 && message.AuthorID != c.options.AuthorID {
 		return false
 	}
-	return c.options.Filter == nil || c.options.Filter(event)
+	return c.options.Filter == nil || c.options.Filter(message)
 }
 
-func (c *MessageCollector) handle(_ context.Context, event *events.MessageCreateEvent) error {
-	if !c.matches(event) {
+func (c *MessageCollector) handle(_ context.Context, message *types.Message) error {
+	if !c.matches(message) {
 		return nil
 	}
 
@@ -249,7 +248,7 @@ func (c *MessageCollector) handle(_ context.Context, event *events.MessageCreate
 		return nil
 	}
 	select {
-	case c.events <- event:
+	case c.events <- message:
 		c.result.Collected++
 		c.resetIdleLocked()
 		var remove func()

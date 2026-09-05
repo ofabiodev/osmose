@@ -37,8 +37,8 @@ func (b Base) Client() Client { return b.client }
 var ErrClosed = errors.New("osmose client closed")
 
 type ReadyHandler func(context.Context, *ReadyEvent) error
-type MessageCreateHandler func(context.Context, *MessageCreateEvent) error
-type MessageUpdateHandler func(context.Context, *MessageUpdateEvent) error
+type MessageHandler func(context.Context, *types.Message) error
+type MessageEditHandler func(context.Context, *types.Message) error
 type MessageDeleteHandler func(context.Context, *MessageDeleteEvent) error
 type MemberCreateHandler func(context.Context, *MemberCreateEvent) error
 type ChannelUpdateHandler func(context.Context, *ChannelUpdateEvent) error
@@ -87,29 +87,6 @@ type ReadyEvent struct {
 	Base
 	User      *types.User
 	SessionID types.ID
-}
-
-type MessageCreateEvent struct {
-	Base
-	Message *types.Message
-	Author  *types.User
-}
-
-// NewMessageCreateEvent creates a message event with a reply callback.
-func NewMessageCreateEvent(base Base, message *types.Message, author *types.User) *MessageCreateEvent {
-	return &MessageCreateEvent{Base: base, Message: message, Author: author}
-}
-
-func (e *MessageCreateEvent) Reply(ctx context.Context, content string) error {
-	if e == nil || e.Base.replyMessage == nil {
-		return ErrClosed
-	}
-	return e.Base.replyMessage(ctx, e.Message, content)
-}
-
-type MessageUpdateEvent struct {
-	Base
-	Message *types.Message
 }
 
 type MessageDeleteEvent struct {

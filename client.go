@@ -44,8 +44,8 @@ type UnexpectedResultError = coreclient.UnexpectedResultError
 func IsPermanent(err error) bool { return coreclient.IsPermanent(err) }
 
 type ReadyHandler = events.ReadyHandler
-type MessageCreateHandler = events.MessageCreateHandler
-type MessageUpdateHandler = events.MessageUpdateHandler
+type MessageHandler = events.MessageHandler
+type MessageEditHandler = events.MessageEditHandler
 type MessageDeleteHandler = events.MessageDeleteHandler
 type MemberCreateHandler = events.MemberCreateHandler
 type ChannelUpdateHandler = events.ChannelUpdateHandler
@@ -68,8 +68,6 @@ type HandlerErrorHandler = events.HandlerErrorHandler
 type EventOverflowHandler = events.EventOverflowHandler
 type ConnectionEvent = events.ConnectionEvent
 type ReadyEvent = events.ReadyEvent
-type MessageCreateEvent = events.MessageCreateEvent
-type MessageUpdateEvent = events.MessageUpdateEvent
 type MessageDeleteEvent = events.MessageDeleteEvent
 type MemberCreateEvent = events.MemberCreateEvent
 type ChannelUpdateEvent = events.ChannelUpdateEvent

@@ -14,9 +14,10 @@ client.OnReady(func(_ context.Context, event *osmose.ReadyEvent) error {
 	return nil
 })
 
-client.OnMessageCreate(func(ctx context.Context, event *osmose.MessageCreateEvent) error {
-	if event.Message.Content == "!ping" {
-		return event.Reply(ctx, "Pong!")
+client.OnMessage(func(ctx context.Context, message *types.Message) error {
+	if message.Content == "!ping" {
+		_, err := message.Reply(ctx, "Pong!")
+		return err
 	}
 	return nil
 })
@@ -24,24 +25,21 @@ client.OnMessageCreate(func(ctx context.Context, event *osmose.MessageCreateEven
 
 ## Available events
 
-For a direct rich-object callback, use the additive `OnMessage` API:
+`OnMessage` receives the created rich message directly. `OnMessageEdit` receives
+the updated rich message:
 
 ```go
-client.OnMessage(func(ctx context.Context, message *types.Message) error {
+client.OnMessageEdit(func(ctx context.Context, message *types.Message) error {
 	if message.Author != nil && message.Author.Bot {
 		return nil
 	}
-	if message.Content != "!ping" {
-		return nil
-	}
-	_, err := message.Reply(ctx, "Pong!")
-	return err
+	log.Printf("message %d changed", message.ID)
+	return nil
 })
 ```
 
-`OnMessageEdit` receives an updated `*types.Message`. Both preserve contexts,
-handler error/panic reporting, and unsubscribe behavior. Existing event-wrapper
-callbacks are unchanged. Import `github.com/ofabiodev/osmose/types` for the model.
+Both handlers preserve contexts, handler error/panic reporting, and unsubscribe
+behavior. Import `github.com/ofabiodev/osmose/types` for the model.
 
 | Handler | Event |
 | --- | --- |
@@ -51,10 +49,8 @@ callbacks are unchanged. Import `github.com/ofabiodev/osmose/types` for the mode
 | `OnDisconnected` | A connection attempt or active connection ended |
 | `OnReconnecting` | The client is waiting before another connection attempt |
 | `OnConnectionError` / `OnError` | A connection attempt failed |
-| `OnMessageCreate` | A message was created |
-| `OnMessage` | A created rich `*types.Message`, without an event wrapper |
-| `OnMessageUpdate` | A message was updated |
-| `OnMessageEdit` | An updated rich `*types.Message`, without an event wrapper |
+| `OnMessage` | A created rich `*types.Message` |
+| `OnMessageEdit` | An updated rich `*types.Message` |
 | `OnMessageDelete` | One or more messages were deleted |
 | `OnChannelUpdate` | A community channel was updated |
 | `OnChannelDelete` | A community channel was deleted |
@@ -76,12 +72,12 @@ Every handler receives a `context.Context` and returns an `error`. Registration
 returns a removal function:
 
 ```go
-remove := client.OnMessageUpdate(handler)
+remove := client.OnMessageEdit(handler)
 defer remove()
 ```
 
-Message events expose `Message`, `Author`, `Client()`, and `Reply(...)` where
-appropriate. Interaction events expose the typed `Interaction` model,
+Message handlers receive the message itself, including `Author` and `Reply(...)`.
+Interaction events expose the typed `Interaction` model,
 `Respond`, `Reply`, `Acknowledge`, and `Defer`. The underlying protobuf value
 remains available through `Raw` on the model. Event payload fields are derived
 from the current Osmium update types, so absent optional protocol fields remain

@@ -20,7 +20,7 @@ func TestEventHandlerCanBeRemoved(t *testing.T) {
 	dispatcher := newEventDispatcher(1, 1, nil)
 	dispatcher.client = &Client{}
 	called := false
-	remove := dispatcher.onMessageCreate(func(context.Context, *MessageCreateEvent) error {
+	remove := dispatcher.onMessage(func(context.Context, *modelTypes.Message) error {
 		called = true
 		return nil
 	})
@@ -38,8 +38,8 @@ func TestEventDispatcherIgnoresNilTypedHandler(t *testing.T) {
 	dispatcher.onHandlerError = func(_ context.Context, failure *HandlerError) {
 		reported <- failure
 	}
-	var handler MessageCreateHandler
-	dispatcher.onMessageCreate(handler)
+	var handler MessageHandler
+	dispatcher.onMessage(handler)
 	dispatcher.dispatch(context.Background(), &updates.Update{Update: &updates.Update_MessageCreated{MessageCreated: &updates.UpdateMessageCreated{}}})
 	select {
 	case failure := <-reported:
@@ -169,7 +169,7 @@ func TestConnectionLifecycleListeners(t *testing.T) {
 func BenchmarkEventDispatch(b *testing.B) {
 	dispatcher := newEventDispatcher(8, 1, nil)
 	dispatcher.client = &Client{}
-	dispatcher.onMessageCreate(func(context.Context, *MessageCreateEvent) error { return nil })
+	dispatcher.onMessage(func(context.Context, *modelTypes.Message) error { return nil })
 	update := &updates.Update{Update: &updates.Update_MessageCreated{MessageCreated: &updates.UpdateMessageCreated{Message: &protoTypes.Message{MessageId: 1, Message: "hello"}}}}
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
@@ -185,26 +185,26 @@ func TestEventDispatcherReportsHandlerErrors(t *testing.T) {
 	dispatcher.onHandlerError = func(_ context.Context, failure *HandlerError) {
 		reported <- failure
 	}
-	dispatcher.onMessageCreate(func(_ context.Context, _ *MessageCreateEvent) error {
+	dispatcher.onMessage(func(_ context.Context, _ *modelTypes.Message) error {
 		return wantErr
 	})
 	dispatcher.dispatch(context.Background(), &updates.Update{Update: &updates.Update_MessageCreated{MessageCreated: &updates.UpdateMessageCreated{}}})
 	select {
 	case failure := <-reported:
-		if failure.Event != "message_create" || !errors.Is(failure.Err, wantErr) || failure.Panic != nil {
+		if failure.Event != "message" || !errors.Is(failure.Err, wantErr) || failure.Panic != nil {
 			t.Fatalf("unexpected handler failure: %#v", failure)
 		}
 	case <-time.After(time.Second):
 		t.Fatal("handler error was not reported")
 	}
 
-	dispatcher.onMessageUpdate(func(context.Context, *MessageUpdateEvent) error {
+	dispatcher.onMessageEdit(func(context.Context, *modelTypes.Message) error {
 		panic("boom")
 	})
 	dispatcher.dispatch(context.Background(), &updates.Update{Update: &updates.Update_Message{Message: &updates.UpdateMessage{}}})
 	select {
 	case failure := <-reported:
-		if failure.Event != "message_update" || failure.Panic != "boom" || len(failure.Stack) == 0 {
+		if failure.Event != "message_edit" || failure.Panic != "boom" || len(failure.Stack) == 0 {
 			t.Fatalf("unexpected panic report: %#v", failure)
 		}
 	case <-time.After(time.Second):
@@ -219,7 +219,7 @@ func TestEventDispatcherReportsQueueOverflow(t *testing.T) {
 	overflow := make(chan uint64, 1)
 	var first sync.Once
 	dispatcher.onEventOverflow = func(dropped uint64) { overflow <- dropped }
-	dispatcher.onMessageCreate(func(context.Context, *MessageCreateEvent) error {
+	dispatcher.onMessage(func(context.Context, *modelTypes.Message) error {
 		first.Do(func() {
 			close(entered)
 			<-release
@@ -264,7 +264,7 @@ func TestEventDispatcherCanCloseWhileHandlerRegisters(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		dispatcher.onMessageCreate(func(context.Context, *MessageCreateEvent) error { return nil })
+		dispatcher.onMessage(func(context.Context, *modelTypes.Message) error { return nil })
 	}()
 	dispatcher.close()
 	wg.Wait()

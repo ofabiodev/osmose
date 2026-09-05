@@ -250,8 +250,7 @@ func CommunityRoleFromProto(value *protoTypes.CommunityRole, clients ...*ObjectC
 type Member = CommunityMember
 type Role = CommunityRole
 
-// Channels returns the channels visible in the community.
-func (c *Community) Channels(ctx context.Context) ([]*Channel, error) {
+func (c *Community) listChannels(ctx context.Context) ([]*Channel, error) {
 	if c == nil {
 		return nil, ErrObjectClientUnavailable
 	}
@@ -273,8 +272,7 @@ func (c *Community) Channels(ctx context.Context) ([]*Channel, error) {
 	return channels, nil
 }
 
-// Members returns all community members, or only the requested member IDs.
-func (c *Community) Members(ctx context.Context, memberIDs ...ID) ([]*Member, error) {
+func (c *Community) listMembers(ctx context.Context, memberIDs ...ID) ([]*Member, error) {
 	if c == nil {
 		return nil, ErrObjectClientUnavailable
 	}
@@ -323,8 +321,7 @@ func (c *Community) Members(ctx context.Context, memberIDs ...ID) ([]*Member, er
 	return members, nil
 }
 
-// Roles returns the roles visible in the community.
-func (c *Community) Roles(ctx context.Context) ([]*Role, error) {
+func (c *Community) listRoles(ctx context.Context) ([]*Role, error) {
 	if c == nil {
 		return nil, ErrObjectClientUnavailable
 	}
@@ -541,19 +538,13 @@ func (c *Channel) Send(ctx context.Context, params MessageSendParams) (*Message,
 	return sendMessage(ctx, c.client, ChannelChat(ref.CommunityID, ref.ChannelID), params)
 }
 
-// Messages returns channel history.
-func (c *Channel) Messages(ctx context.Context, params MessageHistoryParams) (*MessageHistory, error) {
+func (c *Channel) history(ctx context.Context, params MessageHistoryParams) (*MessageHistory, error) {
 	ref, err := c.channelRef()
 	if err != nil {
 		return nil, err
 	}
 	params.Chat = ChannelChat(ref.CommunityID, ref.ChannelID)
 	return getMessageHistory(ctx, c.client, params)
-}
-
-// History is an explicit alias for Messages.
-func (c *Channel) History(ctx context.Context, params MessageHistoryParams) (*MessageHistory, error) {
-	return c.Messages(ctx, params)
 }
 
 // PinnedMessages returns the pinned messages in the channel.

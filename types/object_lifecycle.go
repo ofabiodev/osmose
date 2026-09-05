@@ -117,7 +117,7 @@ func (o *Message) Fetch(ctx context.Context) error {
 // Delete removes the membership without banning the user.
 func (m *CommunityMember) Delete(ctx context.Context) error { return m.Kick(ctx, "") }
 
-// SendText is the string convenience form of Send; Send keeps its v0.2 signature.
+// SendText is the string convenience form of Send.
 func (c *Channel) SendText(ctx context.Context, content string) (*Message, error) {
 	return c.Send(ctx, MessageSendParams{Content: content})
 }

@@ -8,11 +8,9 @@ layout: doc
 
 ## What was found
 
-The v0.2 SDK already supports `community.Members(ctx, userID)`, backed by the
-protocol's targeted `GetMembers.member_ids`. That request does not need to scan
-channels or fetch the community first. However, every completed call goes to the
-server, and services created independent object clients with no shared cache.
-Repeated commands cannot reuse earlier membership or gateway data through the SDK.
+Member lookup uses the protocol's targeted `GetMembers.member_ids`. That request
+does not need to scan channels or fetch the community first. With the shared cache
+enabled, repeated commands can reuse gateway and membership data through the SDK.
 
 The reported custom-command path was also inspected in the local bot project. It
 already has targeted lookup paths and a separate application member cache. Its
@@ -32,7 +30,7 @@ Enable `Config.Cache.Enabled`, then replace repeated membership RPCs with:
 
 ```go
 community := client.Managers.Communities.Ref(communityID)
-member, err := community.Collections().Members.Resolve(ctx, mentionedUserID)
+member, err := community.Members().Resolve(ctx, mentionedUserID)
 if err != nil {
     return err
 }
@@ -80,8 +78,8 @@ to a specific real-world duration is not claimed.
 
 Measure the time from event reception to handler entry separately from time spent
 resolving parameters, fetching membership/roles, accessing the database, and sending
-the reply. A warm `Resolve` should need zero RPCs; explicitly calling legacy
-`Members`, `List`, or fresh `Fetch` still performs network I/O.
+the reply. A warm `Resolve` should need zero RPCs; `List` and fresh `Fetch` still
+perform network I/O by design.
 
 If queueing dominates, inspect slow handlers and only increase `EventWorkers` when
 the bot's handlers and shared data are safe to run concurrently. If one targeted

@@ -16,8 +16,8 @@ import (
 )
 
 type ReadyHandler = eventtypes.ReadyHandler
-type MessageCreateHandler = eventtypes.MessageCreateHandler
-type MessageUpdateHandler = eventtypes.MessageUpdateHandler
+type MessageHandler = eventtypes.MessageHandler
+type MessageEditHandler = eventtypes.MessageEditHandler
 type MessageDeleteHandler = eventtypes.MessageDeleteHandler
 type MemberCreateHandler = eventtypes.MemberCreateHandler
 type ChannelUpdateHandler = eventtypes.ChannelUpdateHandler
@@ -40,8 +40,6 @@ type HandlerErrorHandler = eventtypes.HandlerErrorHandler
 type EventOverflowHandler = eventtypes.EventOverflowHandler
 type ConnectionEvent = eventtypes.ConnectionEvent
 type ReadyEvent = eventtypes.ReadyEvent
-type MessageCreateEvent = eventtypes.MessageCreateEvent
-type MessageUpdateEvent = eventtypes.MessageUpdateEvent
 type MessageDeleteEvent = eventtypes.MessageDeleteEvent
 type MemberCreateEvent = eventtypes.MemberCreateEvent
 type ChannelUpdateEvent = eventtypes.ChannelUpdateEvent
@@ -64,7 +62,7 @@ var ErrEventQueueFull = eventtypes.ErrEventQueueFull
 func newEventBase(client *Client) eventtypes.Base {
 	return eventtypes.NewBase(client,
 		func(ctx context.Context, message *types.Message, content string) error {
-			_, err := client.Messages.Reply(ctx, message, content)
+			_, err := message.Reply(ctx, content)
 			return err
 		},
 		client.replyInteraction,
@@ -93,8 +91,8 @@ type eventDispatcher struct {
 
 	mu               sync.RWMutex
 	ready            []listener[ReadyHandler]
-	messageCreate    []listener[MessageCreateHandler]
-	messageUpdate    []listener[MessageUpdateHandler]
+	message          []listener[MessageHandler]
+	messageEdit      []listener[MessageEditHandler]
 	messageDelete    []listener[MessageDeleteHandler]
 	memberCreate     []listener[MemberCreateHandler]
 	channelUpdate    []listener[ChannelUpdateHandler]
@@ -187,12 +185,12 @@ func (d *eventDispatcher) onReady(fn ReadyHandler) func() {
 	return addListener(d, &d.ready, fn, fn != nil)
 }
 
-func (d *eventDispatcher) onMessageCreate(fn MessageCreateHandler) func() {
-	return addListener(d, &d.messageCreate, fn, fn != nil)
+func (d *eventDispatcher) onMessage(fn MessageHandler) func() {
+	return addListener(d, &d.message, fn, fn != nil)
 }
 
-func (d *eventDispatcher) onMessageUpdate(fn MessageUpdateHandler) func() {
-	return addListener(d, &d.messageUpdate, fn, fn != nil)
+func (d *eventDispatcher) onMessageEdit(fn MessageEditHandler) func() {
+	return addListener(d, &d.messageEdit, fn, fn != nil)
 }
 
 func (d *eventDispatcher) onMessageDelete(fn MessageDeleteHandler) func() {
@@ -378,8 +376,8 @@ func (d *eventDispatcher) dispatch(ctx context.Context, update *updates.Update) 
 	d.mu.RLock()
 	generic := append([]listener[UpdateHandler](nil), d.update...)
 	var (
-		messageCreate    []listener[MessageCreateHandler]
-		messageUpdate    []listener[MessageUpdateHandler]
+		messageListeners []listener[MessageHandler]
+		messageEdit      []listener[MessageEditHandler]
 		messageDelete    []listener[MessageDeleteHandler]
 		memberCreate     []listener[MemberCreateHandler]
 		channelUpdate    []listener[ChannelUpdateHandler]
@@ -398,9 +396,9 @@ func (d *eventDispatcher) dispatch(ctx context.Context, update *updates.Update) 
 	)
 	switch update.GetUpdate().(type) {
 	case *updates.Update_MessageCreated:
-		messageCreate = append([]listener[MessageCreateHandler](nil), d.messageCreate...)
+		messageListeners = append([]listener[MessageHandler](nil), d.message...)
 	case *updates.Update_Message:
-		messageUpdate = append([]listener[MessageUpdateHandler](nil), d.messageUpdate...)
+		messageEdit = append([]listener[MessageEditHandler](nil), d.messageEdit...)
 	case *updates.Update_MessageDeleted:
 		messageDelete = append([]listener[MessageDeleteHandler](nil), d.messageDelete...)
 	case *updates.Update_CommunityMemberCreated:
@@ -442,22 +440,21 @@ func (d *eventDispatcher) dispatch(ctx context.Context, update *updates.Update) 
 	switch value := update.GetUpdate().(type) {
 	case *updates.Update_MessageCreated:
 		author := types.UserFromProto(value.MessageCreated.GetAuthor(), objectClient)
-		message := types.MessageFromProto(value.MessageCreated.GetMessage(), objectClient)
-		if message != nil {
+		richMessage := types.MessageFromProto(value.MessageCreated.GetMessage(), objectClient)
+		if richMessage != nil {
 			if author != nil {
-				message.Author = author
+				richMessage.Author = author
 			} else {
-				author = message.Author
+				author = richMessage.Author
 			}
 		}
-		event := eventtypes.NewMessageCreateEvent(d.base, message, author)
-		for _, item := range messageCreate {
-			d.call("message_create", ctx, func(ctx context.Context) error { return item.fn(ctx, event) })
+		for _, item := range messageListeners {
+			d.call("message", ctx, func(ctx context.Context) error { return item.fn(ctx, richMessage) })
 		}
 	case *updates.Update_Message:
-		event := &MessageUpdateEvent{Base: d.base, Message: types.MessageFromProto(value.Message.GetMessage(), objectClient)}
-		for _, item := range messageUpdate {
-			d.call("message_update", ctx, func(ctx context.Context) error { return item.fn(ctx, event) })
+		richMessage := types.MessageFromProto(value.Message.GetMessage(), objectClient)
+		for _, item := range messageEdit {
+			d.call("message_edit", ctx, func(ctx context.Context) error { return item.fn(ctx, richMessage) })
 		}
 	case *updates.Update_MessageDeleted:
 		ids := make([]types.ID, len(value.MessageDeleted.GetMessageIds()))
@@ -635,38 +632,20 @@ func (d *eventDispatcher) reportOverflow(dropped uint64) {
 
 func (c *Client) OnReady(handler ReadyHandler) func() { return c.events.onReady(handler) }
 
-// OnMessage is the rich-object form of OnMessageCreate. The context, error hook,
-// panic recovery and unsubscribe behavior are shared with the legacy handler.
+// OnMessage registers a handler for created rich message objects.
 func (c *Client) OnMessage(handler func(context.Context, *types.Message) error) func() {
 	if handler == nil {
 		return func() {}
 	}
-	return c.OnMessageCreate(func(ctx context.Context, event *MessageCreateEvent) error {
-		if event.Message == nil {
-			return nil
-		}
-		return handler(ctx, event.Message)
-	})
+	return c.events.onMessage(handler)
 }
 
-// OnMessageEdit is the rich-object form of OnMessageUpdate.
+// OnMessageEdit registers a handler for updated rich message objects.
 func (c *Client) OnMessageEdit(handler func(context.Context, *types.Message) error) func() {
 	if handler == nil {
 		return func() {}
 	}
-	return c.OnMessageUpdate(func(ctx context.Context, event *MessageUpdateEvent) error {
-		if event.Message == nil {
-			return nil
-		}
-		return handler(ctx, event.Message)
-	})
-}
-func (c *Client) OnMessageCreate(handler MessageCreateHandler) func() {
-	remove := c.events.onMessageCreate(handler)
-	return func() { remove() }
-}
-func (c *Client) OnMessageUpdate(handler MessageUpdateHandler) func() {
-	return c.events.onMessageUpdate(handler)
+	return c.events.onMessageEdit(handler)
 }
 func (c *Client) OnMessageDelete(handler MessageDeleteHandler) func() {
 	return c.events.onMessageDelete(handler)

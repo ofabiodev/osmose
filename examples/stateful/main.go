@@ -50,7 +50,7 @@ func main() {
 			_, err := message.Reply(ctx, "Provide a numeric user ID.")
 			return err
 		}
-		member, err := community.Collections().Members.Resolve(ctx, types.ID(id))
+		member, err := community.Members().Resolve(ctx, types.ID(id))
 		if err != nil {
 			return fmt.Errorf("resolve member: %w", err)
 		}
