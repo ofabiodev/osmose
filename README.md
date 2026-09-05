@@ -86,7 +86,7 @@ Legend:
 | Gateway       |    ✅   | Binary protobuf WebSocket, keepalive, reconnect handling                                          |
 | Lifecycle     |    ✅   | Connect, initialize, authorize, ready, reconnect, shutdown                                        |
 | RPC           |    ✅   | Request correlation, context cancellation, timeouts, typed errors                                 |
-| Events        |   🟡   | Typed events for core bot operations. Some protocol updates require Raw access                    |
+| Events        |   🟡   | Typed and direct message callbacks; gateway state synchronization. The protocol has no role events |
 | Collectors    |    ✅   | Message, interaction, and reaction collectors with filters and time limits                        |
 | Messages      |   🟡   | Service and rich-object message operations. High-level media upload/download is still missing      |
 | Chats         |   🟡   | Fetching and members support. Chat management operations are not wrapped yet                      |
@@ -96,9 +96,9 @@ Legend:
 | Voice         |    ✅   | Voice room control-plane operations                                                               |
 | Media         |   🟠   | Protocol support exists. High-level upload/download API is not available yet                      |
 | Interactions  |   🟡   | Basic interaction events and responses. Advanced components are missing                           |
-| Models        |    ✅   | Rich Community, Channel, Message, Member, and Role objects with Raw escape hatches                 |
-| Cache         |    ⚪   | No built-in cache system                                                                          |
-| Managers      |    ⚪   | No object managers yet                                                                            |
+| Models        |    ✅   | Client-bound rich objects, partial references, explicit Fetch, and isolated snapshots with Raw     |
+| Cache         |    ✅   | Optional bounded LRU caches, TTL, invalidation, reconnect clearing, and concurrent read coalescing |
+| Managers      |    ✅   | User, community, channel, member, role, and message managers with scoped collections                |
 | Permissions   |   🟡   | Role and default-permission operations are wrapped; channel overrides remain available through Raw |
 | Builders      |    ⚪   | Message and component builders are planned                                                        |
 | Raw API       |    ✅   | Full protobuf escape hatch for unsupported operations                                             |
@@ -278,6 +278,38 @@ that are not wrapped yet. See the [rich object guide](docs/content/services.md#r
 Reply metadata is available as `message.ReplyInfo`; `message.Reply(ctx, content)`
 is the object operation for sending a reply.
 
+## Managers and state
+
+Enable shared state with `Cache: osmose.CacheConfig{Enabled: true}` in the client
+configuration. Managers also work with caching disabled.
+
+```go
+community := client.Managers.Communities.Ref(communityID) // No RPC.
+members := community.Collections().Members
+
+member, err := members.Resolve(ctx, userID) // Cache hit or one targeted RPC.
+if err != nil {
+	return err
+}
+_, err = member.SendText(ctx, "Hello")
+return err
+```
+
+`Get(id)` is cache-only, `Resolve(ctx, id)` uses complete cached data, and
+`Fetch(ctx, id)` always asks the server. Use `object.Fetch(ctx)` to refresh an
+existing snapshot. The cache has per-entity limits and TTL, is updated before
+gateway handler delivery, and is cleared on disconnect. Roles have no dedicated
+gateway event in the current protocol; fetch fresh permissions when required.
+
+Use `client.OnMessage(func(ctx context.Context, message *types.Message) error)`
+for direct rich-message callbacks. Existing services, `OnMessageCreate`, and
+`community.Members(ctx, ids...)` remain supported; collections use an additive
+`Collections()` accessor to avoid conflicting with those methods.
+
+See [managers and cache behavior](docs/content/state-management.md),
+[member lookup performance](docs/content/member-lookup.md), and the
+[stateful example](examples/stateful/main.go).
+
 ## Services
 
 | Service       | Operations                                                                                 |
@@ -349,6 +381,7 @@ Optional settings include:
 | `ServerURL`                         | Use a different Osmium WebSocket endpoint        |
 | `Logger`                            | Configure `log/slog` output                      |
 | `RequestTimeout`                    | Set the default RPC timeout                      |
+| `Cache`                             | Enable bounded shared entity caches with limits and TTL |
 | `RequestInterval`                   | Add a minimum interval between outbound requests |
 | `HeartbeatInterval`                 | Configure the session keepalive interval         |
 | `EventQueue`, `EventWorkers`        | Control bounded event delivery                   |

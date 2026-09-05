@@ -7,6 +7,7 @@ import (
 	"os/signal"
 
 	"github.com/ofabiodev/osmose"
+	"github.com/ofabiodev/osmose/types"
 )
 
 func main() {
@@ -25,11 +26,12 @@ func main() {
 		log.Printf("connected as %s", event.User.Username)
 		return nil
 	})
-	client.OnMessageCreate(func(ctx context.Context, event *osmose.MessageCreateEvent) error {
-		if event.Message.Content != "!ping" {
+	client.OnMessage(func(ctx context.Context, message *types.Message) error {
+		if message.Content != "!ping" || (message.Author != nil && message.Author.Bot) {
 			return nil
 		}
-		return event.Reply(ctx, "Pong! 🏓")
+		_, err := message.Reply(ctx, "Pong! 🏓")
+		return err
 	})
 
 	if err := client.Run(ctx); err != nil {

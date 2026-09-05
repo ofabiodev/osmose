@@ -19,6 +19,8 @@ focused on events and services.
 - [Events](events/)
 - [Message collectors](collectors/)
 - [Services](services/)
+- [Managers and state](state-management/)
+- [Member lookup performance](member-lookup/)
 - [Protocol and raw API](protocol/)
 - [API reference](api-reference/)
 - [Development](development/)

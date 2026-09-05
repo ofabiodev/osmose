@@ -31,6 +31,7 @@ services:
 | `Users` | `users` | `Get`, `Profile` |
 | `Reactions` | `reactions` | `Add`, `Remove` |
 | `Voice` | `voice` | `RequestRoom`, `RoomStates`, `DisconnectUser` |
+| `Managers` | `types` (also aliased from `osmose`) | `Users`, `Communities`, `Channels`, `Members`, `Roles`, `Messages`, `Clear` |
 
 ## Lifecycle
 
@@ -69,7 +70,9 @@ Registration returns a function that removes that handler.
 | `OnReconnecting` | `ConnectionEvent` before a retry, with `RetryIn` |
 | `OnConnectionError` / `OnError` | `ConnectionEvent` with `Err` |
 | `OnMessageCreate` | `MessageCreateEvent` |
+| `OnMessage` | Direct `*types.Message` on create |
 | `OnMessageUpdate` | `MessageUpdateEvent` |
+| `OnMessageEdit` | Direct `*types.Message` on update |
 | `OnMessageDelete` | `MessageDeleteEvent` |
 | `OnChannelUpdate` | `ChannelUpdateEvent` |
 | `OnChannelDelete` | `ChannelDeleteEvent` |
@@ -100,6 +103,7 @@ Event dispatch is bounded. When the queue is full, the update is dropped so
 the socket reader remains responsive. `Client.DroppedEvents()` returns the
 cumulative count and `Config.OnEventOverflow` receives that count after each
 drop. The overflow callback runs on the socket reader and must not block.
+When caching is enabled, state has already been applied before that delivery drop.
 
 ## Collectors
 
@@ -182,6 +186,23 @@ hide request construction; use `Raw` for unsupported protocol operations.
 `Message.ReplyInfo` contains reply metadata. It is named `ReplyInfo` because
 `Message.Reply(ctx, content)` is the object reply method.
 
+## Managers and partial objects
+
+`Client.Managers` provides `UserManager`, `CommunityManager`, `ChannelManager`,
+`MemberManager`, `RoleManager`, and `MessageManager`. Use `In(communityID)` for
+channels/members/roles and `In(chatRef)` for messages. `Community.Collections()`
+and `Channel.Collections()` provide scoped views without changing existing methods.
+
+`Get(id)` returns a cached snapshot and a found flag. `Resolve(ctx, id)` uses a
+complete cache hit, while `Fetch(ctx, id)` always requests fresh data. Network
+operations return errors. `ListCached`, `Invalidate(id)`, and `Clear` perform no
+I/O. See the full [manager operation table](../state-management/#managers-and-collections).
+
+`Ref(id)` makes a partial object. All six entity types expose `Partial` and
+`Fetch(ctx) error`; object Fetch refreshes the receiver only on success. Cache
+snapshots are isolated from caller mutations. Services and known raw operations
+share cache synchronization; unsupported raw mutations need manual invalidation.
+
 ## Errors
 
 Use `errors.Is` and `errors.As` instead of matching error strings.
@@ -203,6 +224,9 @@ Use `errors.Is` and `errors.As` instead of matching error strings.
 | `osmose.ErrCollectorOverflow` | A collector buffer filled before it was consumed. |
 | `osmose.ErrCollectorClosed` | The client closed while the collector was active. |
 | `osmose.ErrEventQueueFull` | The bounded event queue could not accept an update. |
+| `types.ErrNotFound` | A valid response did not contain the requested entity. |
+| `types.ErrIncompleteObject` | An operation needs complete object data. |
+| `types.ErrObjectClientUnavailable` | A rich object is not bound to a usable client. |
 
 ```go
 if errors.Is(err, osmose.ErrPermanent) {
@@ -245,6 +269,7 @@ wrapping is generated and runtime dispatch does not use reflection.
 | `ServerURL` | Override the Osmium WebSocket endpoint. |
 | `Logger` | Set a `log/slog` logger. |
 | `RequestTimeout` | Default timeout for RPC calls. |
+| `Cache` | Opt-in `CacheConfig`: `Enabled`, `TTL`, and limits for `Users`, `Communities`, `Channels`, `Members`, `Roles`, `Messages`. |
 | `HeartbeatInterval` | Keepalive interval. |
 | `EventQueue`, `EventWorkers` | Bounded event dispatch capacity. `EventWorkers` defaults to one for predictable ordering. |
 | `OnHandlerError` | Observe errors and panics returned by event handlers. |

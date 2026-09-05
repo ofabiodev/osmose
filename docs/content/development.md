@@ -26,6 +26,18 @@ go run .
 The [ping example](https://github.com/ofabiodev/osmose/tree/main/examples/ping)
 shows the smallest complete event-driven bot.
 
+The [stateful example](https://github.com/ofabiodev/osmose/tree/main/examples/stateful)
+demonstrates bounded caching and direct member resolution. From a development checkout:
+
+```bash
+export OSMIUM_TOKEN="your-bot-token"
+export OSMIUM_CLIENT_ID="your-numeric-client-id"
+go run ./examples/stateful
+```
+
+Send `!member <user ID>` in a community. See [member lookup performance](../member-lookup/)
+for a benchmark and the difference between a cache hit and a fresh network fetch.
+
 ## Preview the documentation
 
 The documentation site is built with

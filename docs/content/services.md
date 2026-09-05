@@ -8,6 +8,10 @@ layout: doc
 
 Services accept `context.Context` and small parameter structs.
 
+Services remain compatible with v0.1/v0.2 and share the client's optional state.
+For cache lookups, direct member resolution, and scoped collections, see
+[managers and state](../state-management/).
+
 ## Messages
 
 ```go
@@ -99,7 +103,7 @@ if err != nil {
 	return err
 }
 
-if err := message.Reply(ctx, "Thanks!"); err != nil {
+if _, err := message.Reply(ctx, "Thanks!"); err != nil {
 	return err
 }
 ```
@@ -108,11 +112,12 @@ The rich object operations are:
 
 | Object | Common operations |
 | --- | --- |
-| `Community` | `Channels`, `Members`, `Roles`, `Edit`, `Delete`, `Leave`, `CreateChannel`, `CreateRole`, `AddMember`, `Unban`, `SetDefaultPermissions` |
-| `Channel` | `Send`, `Messages`, `History`, `Search`, `PinnedMessages`, `Members`, `Edit`, `Delete`, `CreateInvite`, `Invites`, `DeleteInvite` |
-| `Message` | `Reply`, `ReplyWith`, `Edit`, `EditWith`, `Delete`, `React`, `Unreact`, `Pin`, `Unpin`, `SetPinned`, `Forward` |
-| `Member` | `Edit`, `SetRoles`, `AddRole`, `RemoveRole`, `Ban`, `Kick`, `Send` |
-| `Role` | `Edit`, `Delete`, `SetPermissions`, `AddPermissions`, `RemovePermissions` |
+| `User` | `Fetch` |
+| `Community` | `Fetch`, `Collections`, `Channels`, `Members`, `Roles`, `Edit`, `Delete`, `Leave`, `CreateChannel`, `CreateRole`, `AddMember`, `Unban`, `SetDefaultPermissions` |
+| `Channel` | `Fetch`, `Collections`, `Send`, `SendText`, `Messages`, `History`, `Search`, `PinnedMessages`, `Members`, `Edit`, `Delete`, `CreateInvite`, `Invites`, `DeleteInvite` |
+| `Message` | `Fetch`, `Community`, `Channel`, `Member`, `Reply`, `ReplyWith`, `Edit`, `EditWith`, `Delete`, `React`, `Unreact`, `Pin`, `Unpin`, `SetPinned`, `Forward` |
+| `Member` | `Fetch`, `Edit`, `SetRoles`, `AddRole`, `RemoveRole`, `Ban`, `Kick`, `Delete`, `Send`, `SendText` |
+| `Role` | `Fetch`, `Edit`, `Delete`, `SetPermissions`, `AddPermissions`, `RemovePermissions` |
 
 `types.MessageReply` is exposed as `Message.ReplyInfo` because `Message.Reply`
 is now the reply operation. The original protobuf message remains available in
