@@ -19,6 +19,7 @@ import (
 	"github.com/ofabiodev/osmose/proto/auth"
 	"github.com/ofabiodev/osmose/proto/core"
 	protoMessages "github.com/ofabiodev/osmose/proto/messages"
+	"github.com/ofabiodev/osmose/proto/updates"
 	"github.com/ofabiodev/osmose/reactions"
 	"github.com/ofabiodev/osmose/types"
 	"github.com/ofabiodev/osmose/users"
@@ -47,6 +48,8 @@ type Client struct {
 	Users       *users.Service
 	Reactions   *reactions.Service
 	Voice       *voice.Service
+	// Managers expose shared state without changing the v0.1/v0.2 services.
+	Managers *types.Managers
 
 	events       *eventDispatcher
 	raw          *RawClient
@@ -87,7 +90,7 @@ func (r *RawClient) Call(ctx context.Context, request proto.Message) (*core.RPCR
 	if r == nil || r.client == nil {
 		return nil, ErrClosed
 	}
-	return r.client.call(ctx, request)
+	return r.client.objectClient.Call(ctx, request)
 }
 
 func New(config Config) (*Client, error) {
@@ -111,13 +114,14 @@ func New(config Config) (*Client, error) {
 	c.events.onEventOverflow = config.OnEventOverflow
 	c.events.setClient(c)
 	c.raw = &RawClient{client: c}
-	c.objectClient = types.NewObjectClient(c.call)
-	c.Messages = messages.New(c.call)
-	c.Chats = chats.New(c.call)
-	c.Communities = communities.New(c.call)
-	c.Users = users.New(c.call)
-	c.Reactions = reactions.New(c.call)
-	c.Voice = voice.New(c.call)
+	c.objectClient = types.NewObjectClient(c.call, config.Cache)
+	c.Managers = c.objectClient.Managers()
+	c.Messages = messages.New(c.objectClient.Call, c.objectClient)
+	c.Chats = chats.New(c.objectClient.Call, c.objectClient)
+	c.Communities = communities.New(c.objectClient.Call, c.objectClient)
+	c.Users = users.New(c.objectClient.Call, c.objectClient)
+	c.Reactions = reactions.New(c.objectClient.Call)
+	c.Voice = voice.New(c.objectClient.Call)
 	return c, nil
 }
 
@@ -384,7 +388,8 @@ func (c *Client) runConnection(root context.Context, attempt int) (bool, error) 
 	if authorization == nil || authorization.GetUser() == nil {
 		return false, permanentError(ErrProtocolMismatch, &UnexpectedResultError{Method: "auth.authorize"})
 	}
-	user := types.UserFromProto(authorization.GetUser())
+	user := types.UserFromProto(authorization.GetUser(), c.objectClient)
+	c.objectClient.ApplyUpdate(&updates.Update{Update: &updates.Update_User{User: &updates.UpdateUser{UserId: authorization.GetUser().GetId(), User: authorization.GetUser()}}})
 	c.userMu.Lock()
 	c.user = user
 	c.userMu.Unlock()
@@ -489,6 +494,7 @@ func (c *Client) handleFrame(active *activeConnection, data []byte) {
 		return
 	}
 	if update := serverMessage.GetUpdate(); update != nil {
+		c.objectClient.ApplyUpdate(update)
 		if err := c.events.enqueue(active.ctx, update); err != nil && active.ctx.Err() == nil {
 			c.logger.Warn("event queue enqueue failed", "error", err)
 		}
@@ -502,6 +508,7 @@ func (c *Client) cleanupActive(active *activeConnection) {
 	active.broker.FailAll(ErrDisconnected)
 	active.conn.Close()
 	active.conn.Wait()
+	c.objectClient.ClearCache()
 	c.activeMu.Lock()
 	if c.active == active {
 		c.active = nil

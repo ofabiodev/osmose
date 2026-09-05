@@ -10,10 +10,13 @@ import (
 	"time"
 
 	"github.com/ofabiodev/osmose/internal/gateway"
+	"github.com/ofabiodev/osmose/types"
 )
 
 // Config controls a Client. Zero values use sensible defaults.
 type Config struct {
+	// Cache is opt-in. Managers and partial objects work when it is disabled.
+	Cache    types.CacheConfig
 	Token    string
 	ClientID uint32
 
@@ -100,6 +103,9 @@ func (c Config) withDefaults() Config {
 }
 
 func (c Config) validate() error {
+	if err := c.Cache.Validate(); err != nil {
+		return err
+	}
 	if strings.TrimSpace(c.Token) == "" {
 		return fmt.Errorf("token is required")
 	}

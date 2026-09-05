@@ -9,10 +9,19 @@ import (
 	"github.com/ofabiodev/osmose/collectors"
 	"github.com/ofabiodev/osmose/events"
 	coreclient "github.com/ofabiodev/osmose/internal/client"
+	"github.com/ofabiodev/osmose/types"
 )
 
 type Client = coreclient.Client
 type Config = coreclient.Config
+type CacheConfig = types.CacheConfig
+type Managers = types.Managers
+type UserManager = types.UserManager
+type CommunityManager = types.CommunityManager
+type ChannelManager = types.ChannelManager
+type MemberManager = types.MemberManager
+type RoleManager = types.RoleManager
+type MessageManager = types.MessageManager
 type RawClient = coreclient.RawClient
 
 func New(config Config) (*Client, error) { return coreclient.New(config) }

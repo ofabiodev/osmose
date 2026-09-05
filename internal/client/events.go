@@ -441,10 +441,14 @@ func (d *eventDispatcher) dispatch(ctx context.Context, update *updates.Update) 
 	}
 	switch value := update.GetUpdate().(type) {
 	case *updates.Update_MessageCreated:
-		author := types.UserFromProto(value.MessageCreated.GetAuthor())
+		author := types.UserFromProto(value.MessageCreated.GetAuthor(), objectClient)
 		message := types.MessageFromProto(value.MessageCreated.GetMessage(), objectClient)
 		if message != nil {
-			message.Author = author
+			if author != nil {
+				message.Author = author
+			} else {
+				author = message.Author
+			}
 		}
 		event := eventtypes.NewMessageCreateEvent(d.base, message, author)
 		for _, item := range messageCreate {
@@ -466,9 +470,20 @@ func (d *eventDispatcher) dispatch(ctx context.Context, update *updates.Update) 
 		}
 	case *updates.Update_CommunityMemberCreated:
 		member := types.CommunityMemberFromProto(value.CommunityMemberCreated.GetMember(), objectClient)
-		user := types.UserFromProto(value.CommunityMemberCreated.GetUser())
+		user := types.UserFromProto(value.CommunityMemberCreated.GetUser(), objectClient)
+		if member == nil && objectClient != nil {
+			member = objectClient.Managers().Members.In(types.ID(value.CommunityMemberCreated.GetCommunityId())).Ref(types.ID(value.CommunityMemberCreated.GetMemberId()))
+		}
 		if member != nil {
-			member.User = user
+			if member.CommunityID == 0 {
+				member.CommunityID = types.ID(value.CommunityMemberCreated.GetCommunityId())
+			}
+			if member.ID == 0 {
+				member.ID = types.ID(value.CommunityMemberCreated.GetMemberId())
+			}
+			if user != nil {
+				member.User = user
+			}
 		}
 		event := &MemberCreateEvent{Base: d.base, CommunityID: types.ID(value.CommunityMemberCreated.GetCommunityId()), MemberID: types.ID(value.CommunityMemberCreated.GetMemberId()), Member: member, User: user}
 		for _, item := range memberCreate {
@@ -485,12 +500,18 @@ func (d *eventDispatcher) dispatch(ctx context.Context, update *updates.Update) 
 			d.call("channel_delete", ctx, func(ctx context.Context) error { return item.fn(ctx, event) })
 		}
 	case *updates.Update_User:
-		event := &UserUpdateEvent{Base: d.base, UserID: types.ID(value.User.GetUserId()), User: types.UserFromProto(value.User.GetUser())}
+		event := &UserUpdateEvent{Base: d.base, UserID: types.ID(value.User.GetUserId()), User: types.UserFromProto(value.User.GetUser(), objectClient)}
+		if event.User == nil && objectClient != nil {
+			event.User = objectClient.Managers().Users.Ref(event.UserID)
+		}
 		for _, item := range userUpdate {
 			d.call("user_update", ctx, func(ctx context.Context) error { return item.fn(ctx, event) })
 		}
 	case *updates.Update_Community:
 		event := &CommunityUpdateEvent{Base: d.base, CommunityID: types.ID(value.Community.GetCommunityId()), Community: types.CommunityFromProto(value.Community.GetCommunity(), objectClient)}
+		if event.Community == nil && objectClient != nil {
+			event.Community = objectClient.Managers().Communities.Ref(event.CommunityID)
+		}
 		for _, item := range communityUpdate {
 			d.call("community_update", ctx, func(ctx context.Context) error { return item.fn(ctx, event) })
 		}
@@ -510,6 +531,17 @@ func (d *eventDispatcher) dispatch(ctx context.Context, update *updates.Update) 
 		}
 	case *updates.Update_CommunityMember:
 		event := &MemberUpdateEvent{Base: d.base, CommunityID: types.ID(value.CommunityMember.GetCommunityId()), MemberID: types.ID(value.CommunityMember.GetMemberId()), Member: types.CommunityMemberFromProto(value.CommunityMember.GetMember(), objectClient)}
+		if event.Member == nil && objectClient != nil {
+			event.Member = objectClient.Managers().Members.In(event.CommunityID).Ref(event.MemberID)
+		}
+		if event.Member != nil {
+			if event.Member.ID == 0 {
+				event.Member.ID = event.MemberID
+			}
+			if event.Member.CommunityID == 0 {
+				event.Member.CommunityID = event.CommunityID
+			}
+		}
 		for _, item := range memberUpdate {
 			d.call("member_update", ctx, func(ctx context.Context) error { return item.fn(ctx, event) })
 		}
@@ -602,6 +634,33 @@ func (d *eventDispatcher) reportOverflow(dropped uint64) {
 }
 
 func (c *Client) OnReady(handler ReadyHandler) func() { return c.events.onReady(handler) }
+
+// OnMessage is the rich-object form of OnMessageCreate. The context, error hook,
+// panic recovery and unsubscribe behavior are shared with the legacy handler.
+func (c *Client) OnMessage(handler func(context.Context, *types.Message) error) func() {
+	if handler == nil {
+		return func() {}
+	}
+	return c.OnMessageCreate(func(ctx context.Context, event *MessageCreateEvent) error {
+		if event.Message == nil {
+			return nil
+		}
+		return handler(ctx, event.Message)
+	})
+}
+
+// OnMessageEdit is the rich-object form of OnMessageUpdate.
+func (c *Client) OnMessageEdit(handler func(context.Context, *types.Message) error) func() {
+	if handler == nil {
+		return func() {}
+	}
+	return c.OnMessageUpdate(func(ctx context.Context, event *MessageUpdateEvent) error {
+		if event.Message == nil {
+			return nil
+		}
+		return handler(ctx, event.Message)
+	})
+}
 func (c *Client) OnMessageCreate(handler MessageCreateHandler) func() {
 	remove := c.events.onMessageCreate(handler)
 	return func() { remove() }
