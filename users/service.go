@@ -14,11 +14,18 @@ import (
 
 // Service provides user lookup operations.
 type Service struct {
-	call func(context.Context, proto.Message) (*core.RPCResult, error)
+	call         func(context.Context, proto.Message) (*core.RPCResult, error)
+	objectClient *types.ObjectClient
 }
 
-func New(call func(context.Context, proto.Message) (*core.RPCResult, error)) *Service {
-	return &Service{call: call}
+func New(call func(context.Context, proto.Message) (*core.RPCResult, error), clients ...*types.ObjectClient) *Service {
+	var objectClient *types.ObjectClient
+	if len(clients) != 0 && clients[0] != nil {
+		objectClient = clients[0]
+	} else {
+		objectClient = types.NewObjectClient(call)
+	}
+	return &Service{call: objectClient.Call, objectClient: objectClient}
 }
 
 type Profile struct {
@@ -40,7 +47,7 @@ func (s *Service) Get(ctx context.Context, username string) (*types.User, error)
 	if details == nil || details.GetUser() == nil {
 		return nil, &rpc.UnexpectedResultError{Method: "users.lookupUsername"}
 	}
-	return types.UserFromProto(details.GetUser()), nil
+	return types.UserFromProto(details.GetUser(), s.objectClient), nil
 }
 
 func (s *Service) Profile(ctx context.Context, ref types.UserRef) (*Profile, error) {

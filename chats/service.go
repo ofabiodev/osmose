@@ -18,8 +18,14 @@ type Service struct {
 	objectClient *types.ObjectClient
 }
 
-func New(call func(context.Context, proto.Message) (*core.RPCResult, error)) *Service {
-	return &Service{call: call, objectClient: types.NewObjectClient(call)}
+func New(call func(context.Context, proto.Message) (*core.RPCResult, error), clients ...*types.ObjectClient) *Service {
+	var objectClient *types.ObjectClient
+	if len(clients) != 0 && clients[0] != nil {
+		objectClient = clients[0]
+	} else {
+		objectClient = types.NewObjectClient(call)
+	}
+	return &Service{call: objectClient.Call, objectClient: objectClient}
 }
 
 type ListParams struct {
@@ -76,7 +82,7 @@ func (s *Service) List(ctx context.Context, params ListParams) (*ListResult, err
 	response := &ListResult{Raw: value}
 	users := make(map[types.ID]*types.User, len(value.GetUsers()))
 	for _, user := range value.GetUsers() {
-		model := types.UserFromProto(user)
+		model := types.UserFromProto(user, s.objectClient)
 		response.Users = append(response.Users, model)
 		if model != nil {
 			users[model.ID] = model
@@ -93,7 +99,7 @@ func (s *Service) List(ctx context.Context, params ListParams) (*ListResult, err
 	}
 	for _, message := range value.GetMessages() {
 		model := types.MessageFromProto(message, s.objectClient)
-		if model != nil {
+		if model != nil && users[model.AuthorID] != nil {
 			model.Author = users[model.AuthorID]
 		}
 		response.Messages = append(response.Messages, model)
@@ -123,13 +129,13 @@ func (s *Service) Get(ctx context.Context, ref types.ChatRef) (*Chat, error) {
 	}
 	users := make(map[types.ID]*types.User, len(value.GetUsers()))
 	for _, user := range value.GetUsers() {
-		model := types.UserFromProto(user)
+		model := types.UserFromProto(user, s.objectClient)
 		response.Users = append(response.Users, model)
 		if model != nil {
 			users[model.ID] = model
 		}
 	}
-	if response.Message != nil {
+	if response.Message != nil && users[response.Message.AuthorID] != nil {
 		response.Message.Author = users[response.Message.AuthorID]
 	}
 	return response, nil
@@ -155,7 +161,7 @@ func (s *Service) Members(ctx context.Context, ref types.ChatRef) (*Members, err
 		response.Members = append(response.Members, types.ChatMemberFromProto(member))
 	}
 	for _, user := range value.GetUsers() {
-		response.Users = append(response.Users, types.UserFromProto(user))
+		response.Users = append(response.Users, types.UserFromProto(user, s.objectClient))
 	}
 	return response, nil
 }

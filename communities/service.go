@@ -17,8 +17,14 @@ type Service struct {
 	objectClient *types.ObjectClient
 }
 
-func New(call func(context.Context, proto.Message) (*core.RPCResult, error)) *Service {
-	return &Service{call: call, objectClient: types.NewObjectClient(call)}
+func New(call func(context.Context, proto.Message) (*core.RPCResult, error), clients ...*types.ObjectClient) *Service {
+	var objectClient *types.ObjectClient
+	if len(clients) != 0 && clients[0] != nil {
+		objectClient = clients[0]
+	} else {
+		objectClient = types.NewObjectClient(call)
+	}
+	return &Service{call: objectClient.Call, objectClient: objectClient}
 }
 
 type ListResult struct {
@@ -102,7 +108,7 @@ func (s *Service) ChannelMembers(ctx context.Context, communityID, channelID typ
 	}
 	response := &ChannelMembersResult{Raw: value}
 	for _, entry := range value.GetEntries() {
-		response.Entries = append(response.Entries, types.MemberListEntryFromProto(entry))
+		response.Entries = append(response.Entries, types.MemberListEntryFromProto(entry, s.objectClient))
 	}
 	return response, nil
 }
