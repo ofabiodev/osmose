@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/ofabiodev/osmose/internal/rpc"
+	"github.com/ofabiodev/osmose/internal/state"
 	protoAuth "github.com/ofabiodev/osmose/proto/auth"
 	protoChats "github.com/ofabiodev/osmose/proto/chats"
 	protoCommunities "github.com/ofabiodev/osmose/proto/communities"
@@ -18,17 +20,26 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// ObjectClient is the private call boundary attached to models returned by
-// services. Rich object methods use it to keep protocol details out of bot
-// code while preserving Raw for callers that need the escape hatch.
+// ObjectClient is the private call boundary attached to models returned by the
+// high-level API. Rich object methods use it to keep protocol details out of
+// bot code while preserving Raw for callers that need the escape hatch.
 type ObjectClient struct {
-	call func(context.Context, proto.Message) (*core.RPCResult, error)
+	call     func(context.Context, proto.Message) (*core.RPCResult, error)
+	cache    *state.Cache
+	flightMu sync.Mutex
+	flights  map[string]*objectFlight
+	managers *managerSet
 }
 
-// NewObjectClient binds rich models to an Osmium call function. It is mainly
-// used by Osmose services and is not needed when using the root Client.
-func NewObjectClient(call func(context.Context, proto.Message) (*core.RPCResult, error)) *ObjectClient {
-	return &ObjectClient{call: call}
+// NewObjectClient binds rich models to an Osmium call function and cache.
+func NewObjectClient(call func(context.Context, proto.Message) (*core.RPCResult, error), configs ...CacheConfig) *ObjectClient {
+	var config CacheConfig
+	if len(configs) != 0 {
+		config = configs[0]
+	}
+	c := &ObjectClient{call: call, cache: state.New(config), flights: make(map[string]*objectFlight)}
+	c.managers = newManagerSet(c)
+	return c
 }
 
 var ErrObjectClientUnavailable = errors.New("rich object client unavailable")
@@ -47,7 +58,7 @@ func callObject(client *ObjectClient, ctx context.Context, request proto.Message
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	return client.call(ctx, request)
+	return client.Call(ctx, request)
 }
 
 func requireObjectID(id ID, name string) error {
@@ -203,6 +214,7 @@ type InvitePreview struct {
 
 // CommunityRole is a role that belongs to a community.
 type CommunityRole struct {
+	Partial     bool
 	ID          ID
 	CommunityID ID
 	Name        string
@@ -237,8 +249,7 @@ func CommunityRoleFromProto(value *protoTypes.CommunityRole, clients ...*ObjectC
 type Member = CommunityMember
 type Role = CommunityRole
 
-// Channels returns the channels visible in the community.
-func (c *Community) Channels(ctx context.Context) ([]*Channel, error) {
+func (c *Community) listChannels(ctx context.Context) ([]*Channel, error) {
 	if c == nil {
 		return nil, ErrObjectClientUnavailable
 	}
@@ -260,8 +271,7 @@ func (c *Community) Channels(ctx context.Context) ([]*Channel, error) {
 	return channels, nil
 }
 
-// Members returns all community members, or only the requested member IDs.
-func (c *Community) Members(ctx context.Context, memberIDs ...ID) ([]*Member, error) {
+func (c *Community) listMembers(ctx context.Context, memberIDs ...ID) ([]*Member, error) {
 	if c == nil {
 		return nil, ErrObjectClientUnavailable
 	}
@@ -285,7 +295,7 @@ func (c *Community) Members(ctx context.Context, memberIDs ...ID) ([]*Member, er
 	}
 	users := make(map[ID]*User, len(value.GetUsers()))
 	for _, user := range value.GetUsers() {
-		model := UserFromProto(user)
+		model := UserFromProto(user, c.client)
 		if model != nil {
 			users[model.ID] = model
 		}
@@ -293,16 +303,24 @@ func (c *Community) Members(ctx context.Context, memberIDs ...ID) ([]*Member, er
 	members := make([]*Member, 0, len(value.GetMembers()))
 	for _, member := range value.GetMembers() {
 		model := CommunityMemberFromProto(member, c.client)
+		if model == nil {
+			continue
+		}
 		if model != nil {
+			if model.CommunityID == 0 {
+				model.CommunityID = c.ID
+			}
 			model.User = users[model.ID]
+			if model.User == nil {
+				model.User, _ = c.client.managers.Users.Get(model.ID)
+			}
 		}
 		members = append(members, model)
 	}
 	return members, nil
 }
 
-// Roles returns the roles visible in the community.
-func (c *Community) Roles(ctx context.Context) ([]*Role, error) {
+func (c *Community) listRoles(ctx context.Context) ([]*Role, error) {
 	if c == nil {
 		return nil, ErrObjectClientUnavailable
 	}
@@ -319,7 +337,13 @@ func (c *Community) Roles(ctx context.Context) ([]*Role, error) {
 	}
 	roles := make([]*Role, 0, len(value.GetRoles()))
 	for _, role := range value.GetRoles() {
-		roles = append(roles, CommunityRoleFromProto(role, c.client))
+		model := CommunityRoleFromProto(role, c.client)
+		if model != nil {
+			if model.CommunityID == 0 {
+				model.CommunityID = c.ID
+			}
+			roles = append(roles, model)
+		}
 	}
 	return roles, nil
 }
@@ -506,58 +530,17 @@ func (c *Channel) channelRef() (ChannelRef, error) {
 
 // Send sends a message to the channel and returns a usable message object.
 func (c *Channel) Send(ctx context.Context, params MessageSendParams) (*Message, error) {
-	ref, err := c.channelRef()
-	if err != nil {
-		return nil, err
-	}
-	return sendMessage(ctx, c.client, ChannelChat(ref.CommunityID, ref.ChannelID), params)
-}
-
-// Messages returns channel history.
-func (c *Channel) Messages(ctx context.Context, params MessageHistoryParams) (*MessageHistory, error) {
-	ref, err := c.channelRef()
-	if err != nil {
-		return nil, err
-	}
-	params.Chat = ChannelChat(ref.CommunityID, ref.ChannelID)
-	return getMessageHistory(ctx, c.client, params)
-}
-
-// History is an explicit alias for Messages.
-func (c *Channel) History(ctx context.Context, params MessageHistoryParams) (*MessageHistory, error) {
-	return c.Messages(ctx, params)
+	return c.Messages().CreateWith(ctx, params)
 }
 
 // PinnedMessages returns the pinned messages in the channel.
 func (c *Channel) PinnedMessages(ctx context.Context) (*MessageHistory, error) {
-	ref, err := c.channelRef()
-	if err != nil {
-		return nil, err
-	}
-	chat, err := refChat(ref)
-	if err != nil {
-		return nil, err
-	}
-	result, err := callObject(c.client, ctx, &protoMessages.GetPinnedMessages{ChatRef: chat})
-	if err != nil {
-		return nil, err
-	}
-	value := result.GetMessages()
-	if value == nil {
-		return nil, &rpc.UnexpectedResultError{Method: "messages.getPinnedMessages"}
-	}
-	return messageHistoryFromProto(value, c.client), nil
+	return c.Messages().PinnedMessages(ctx)
 }
 
 // Search finds messages in this channel.
 func (c *Channel) Search(ctx context.Context, params MessageSearchParams) (*MessageHistory, error) {
-	ref, err := c.channelRef()
-	if err != nil {
-		return nil, err
-	}
-	params.Chat = ChannelChat(ref.CommunityID, ref.ChannelID)
-	params.Scoped = true
-	return searchMessages(ctx, c.client, params)
+	return c.Messages().Search(ctx, params)
 }
 
 // Members returns the ordered member list visible in the channel.
@@ -576,7 +559,7 @@ func (c *Channel) Members(ctx context.Context) ([]*MemberListEntry, error) {
 	}
 	entries := make([]*MemberListEntry, 0, len(value.GetEntries()))
 	for _, entry := range value.GetEntries() {
-		entries = append(entries, MemberListEntryFromProto(entry))
+		entries = append(entries, MemberListEntryFromProto(entry, c.client))
 	}
 	return entries, nil
 }
@@ -923,7 +906,7 @@ func (m *CommunityMember) Edit(ctx context.Context, options MemberEditOptions) e
 
 // SetRoles replaces all roles on the member.
 func (m *CommunityMember) SetRoles(ctx context.Context, roleIDs ...ID) error {
-	return m.Edit(ctx, MemberEditOptions{RoleIDs: append([]ID(nil), roleIDs...)})
+	return m.Edit(ctx, MemberEditOptions{RoleIDs: append([]ID{}, roleIDs...)})
 }
 
 // AddRole adds a role if it is not already assigned.
@@ -933,6 +916,11 @@ func (m *CommunityMember) AddRole(ctx context.Context, roleID ID) error {
 	}
 	if err := requireObjectID(roleID, "role"); err != nil {
 		return err
+	}
+	if m.Partial {
+		if err := m.Fetch(ctx); err != nil {
+			return err
+		}
 	}
 	for _, current := range m.RoleIDs {
 		if current == roleID {
@@ -950,6 +938,11 @@ func (m *CommunityMember) RemoveRole(ctx context.Context, roleID ID) error {
 	}
 	if err := requireObjectID(roleID, "role"); err != nil {
 		return err
+	}
+	if m.Partial {
+		if err := m.Fetch(ctx); err != nil {
+			return err
+		}
 	}
 	roles := make([]ID, 0, len(m.RoleIDs))
 	found := false
@@ -1017,6 +1010,14 @@ func (m *CommunityMember) remove(ctx context.Context, options BanOptions, ban bo
 	if err != nil {
 		return err
 	}
+	if removed := result.GetRemovedMembers(); removed != nil {
+		for _, member := range removed.GetMembers() {
+			if ID(member.GetUserId()) == m.ID {
+				return nil
+			}
+		}
+		return ErrNotFound
+	}
 	return rpc.EnsureVoid(result, "communities.removeMembers")
 }
 
@@ -1030,6 +1031,11 @@ func (r *CommunityRole) Edit(ctx context.Context, options RoleEditOptions) error
 	}
 	if err := requireObjectID(r.ID, "role"); err != nil {
 		return err
+	}
+	if r.Partial {
+		if err := r.Fetch(ctx); err != nil {
+			return err
+		}
 	}
 	name := r.Name
 	permissions := r.Permissions
@@ -1089,6 +1095,11 @@ func (r *CommunityRole) AddPermissions(ctx context.Context, permissions uint64) 
 	if r == nil {
 		return ErrObjectClientUnavailable
 	}
+	if r.Partial {
+		if err := r.Fetch(ctx); err != nil {
+			return err
+		}
+	}
 	value := r.Permissions | permissions
 	return r.SetPermissions(ctx, value)
 }
@@ -1097,6 +1108,11 @@ func (r *CommunityRole) AddPermissions(ctx context.Context, permissions uint64) 
 func (r *CommunityRole) RemovePermissions(ctx context.Context, permissions uint64) error {
 	if r == nil {
 		return ErrObjectClientUnavailable
+	}
+	if r.Partial {
+		if err := r.Fetch(ctx); err != nil {
+			return err
+		}
 	}
 	value := r.Permissions &^ permissions
 	return r.SetPermissions(ctx, value)
@@ -1185,7 +1201,7 @@ func sendMessage(ctx context.Context, client *ObjectClient, chat ChatRef, params
 	if sent == nil {
 		return nil, &rpc.UnexpectedResultError{Method: "messages.sendMessage"}
 	}
-	return &Message{ID: ID(sent.GetMessageId()), Chat: chat, AuthorID: 0, Content: params.Content, ReplyTo: params.ReplyTo, client: client}, nil
+	return &Message{ID: ID(sent.GetMessageId()), Chat: chat, AuthorID: 0, Content: params.Content, ReplyTo: params.ReplyTo, Partial: true, client: client}, nil
 }
 
 func editMessage(ctx context.Context, client *ObjectClient, params MessageEditParams) error {
@@ -1302,7 +1318,7 @@ func messageHistoryFromProto(value *protoMessages.Messages, client *ObjectClient
 	history := &MessageHistory{Raw: value}
 	users := make(map[ID]*User, len(value.GetUsers()))
 	for _, user := range value.GetUsers() {
-		model := UserFromProto(user)
+		model := UserFromProto(user, client)
 		history.Users = append(history.Users, model)
 		if model != nil {
 			users[model.ID] = model
@@ -1310,7 +1326,7 @@ func messageHistoryFromProto(value *protoMessages.Messages, client *ObjectClient
 	}
 	for _, message := range value.GetMessages() {
 		model := MessageFromProto(message, client)
-		if model != nil {
+		if model != nil && users[model.AuthorID] != nil {
 			model.Author = users[model.AuthorID]
 		}
 		history.Messages = append(history.Messages, model)

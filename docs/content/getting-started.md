@@ -39,6 +39,7 @@ import (
 	"os/signal"
 
 	"github.com/ofabiodev/osmose"
+	"github.com/ofabiodev/osmose/types"
 )
 
 func main() {
@@ -58,11 +59,12 @@ func main() {
 		return nil
 	})
 
-	client.OnMessageCreate(func(ctx context.Context, event *osmose.MessageCreateEvent) error {
-		if event.Message.Content != "!ping" {
+	client.OnMessage(func(ctx context.Context, message *types.Message) error {
+		if message.Content != "!ping" {
 			return nil
 		}
-		return event.Reply(ctx, "Pong! 🏓")
+		_, err := message.Reply(ctx, "Pong! 🏓")
+		return err
 	})
 
 	if err := client.Run(ctx); err != nil {
@@ -77,5 +79,6 @@ reconnect, and shutdown.
 ## Next steps
 
 - Read [Events](../events/) to handle messages and interactions.
-- Use [Services](../services/) to send messages and query Osmium.
-- Use [Protocol and raw API](../protocol/) when a service does not cover an endpoint yet.
+- Use [managers and rich objects](../state-management/) for stateful entity operations.
+- Use [specialized services](../services/) for chats and voice.
+- Use [Protocol and raw API](../protocol/) when a high-level API does not cover an endpoint yet.

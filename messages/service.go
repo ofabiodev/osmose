@@ -18,8 +18,14 @@ type Service struct {
 	objectClient *types.ObjectClient
 }
 
-func New(call func(context.Context, proto.Message) (*core.RPCResult, error)) *Service {
-	return &Service{call: call, objectClient: types.NewObjectClient(call)}
+func New(call func(context.Context, proto.Message) (*core.RPCResult, error), clients ...*types.ObjectClient) *Service {
+	var objectClient *types.ObjectClient
+	if len(clients) != 0 && clients[0] != nil {
+		objectClient = clients[0]
+	} else {
+		objectClient = types.NewObjectClient(call)
+	}
+	return &Service{call: objectClient.Call, objectClient: objectClient}
 }
 
 type Button = types.MessageButton
@@ -290,7 +296,7 @@ func mapHistory(value *protoMessages.Messages, client *types.ObjectClient) *Hist
 	history := &History{Raw: value}
 	users := make(map[types.ID]*types.User, len(value.GetUsers()))
 	for _, user := range value.GetUsers() {
-		model := types.UserFromProto(user)
+		model := types.UserFromProto(user, client)
 		history.Users = append(history.Users, model)
 		if model != nil {
 			users[model.ID] = model
@@ -298,7 +304,7 @@ func mapHistory(value *protoMessages.Messages, client *types.ObjectClient) *Hist
 	}
 	for _, message := range value.GetMessages() {
 		model := types.MessageFromProto(message, client)
-		if model != nil {
+		if model != nil && users[model.AuthorID] != nil {
 			model.Author = users[model.AuthorID]
 		}
 		history.Messages = append(history.Messages, model)

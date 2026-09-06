@@ -11,6 +11,7 @@ import (
 	protoRefs "github.com/ofabiodev/osmose/proto/refs"
 	protoTypes "github.com/ofabiodev/osmose/proto/types"
 	protoUpdates "github.com/ofabiodev/osmose/proto/updates"
+	protoUsers "github.com/ofabiodev/osmose/proto/users"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -82,6 +83,8 @@ func UserStatusFromProto(value *protoTypes.UserStatus) *UserStatus {
 
 // User is the useful, stable part of an Osmium user model.
 type User struct {
+	Partial  bool
+	client   *ObjectClient
 	ID       ID
 	Name     string
 	Username string
@@ -91,6 +94,13 @@ type User struct {
 	Color    uint32
 	Bot      bool
 	Raw      *protoTypes.User
+}
+
+// UserProfile contains profile metadata returned separately from User.
+type UserProfile struct {
+	Ref UserRef
+	Bio string
+	Raw *protoUsers.Profile
 }
 
 // Interaction is the protocol's typed interaction update. The current
@@ -117,11 +127,12 @@ func InteractionFromProto(value *protoUpdates.UpdateInteraction) *Interaction {
 	}
 }
 
-func UserFromProto(value *protoTypes.User) *User {
+func UserFromProto(value *protoTypes.User, clients ...*ObjectClient) *User {
 	if value == nil {
 		return nil
 	}
 	return &User{
+		client:   firstObjectClient(clients...),
 		ID:       ID(value.GetId()),
 		Name:     value.GetName(),
 		Username: value.GetUsername(),
@@ -137,6 +148,7 @@ func UserFromProto(value *protoTypes.User) *User {
 // Message exposes the fields most bot handlers need without making them
 // understand protobuf's generated field names.
 type Message struct {
+	Partial   bool
 	ID        ID
 	Chat      ChatRef
 	AuthorID  ID
@@ -158,7 +170,7 @@ func MessageFromProto(value *protoTypes.Message, clients ...*ObjectClient) *Mess
 	if value == nil {
 		return nil
 	}
-	return &Message{
+	model := &Message{
 		ID:        ID(value.GetMessageId()),
 		Chat:      ChatRefFromProto(value.GetChatRef()),
 		AuthorID:  ID(value.GetAuthorId()),
@@ -174,6 +186,10 @@ func MessageFromProto(value *protoTypes.Message, clients ...*ObjectClient) *Mess
 		Raw:       value,
 		client:    firstObjectClient(clients...),
 	}
+	if model.client != nil {
+		model.Author, _ = model.client.managers.Users.Get(model.AuthorID)
+	}
+	return model
 }
 
 // MessageQuote is the quoted part of a reply, when the protocol includes it.
@@ -526,6 +542,7 @@ func GroupFromProto(value *protoTypes.Group) *Group {
 
 // Channel is a community channel model.
 type Channel struct {
+	Partial              bool
 	ID                   ID
 	CommunityID          ID
 	Name                 string
@@ -564,6 +581,7 @@ func ChannelFromProto(value *protoTypes.Channel, clients ...*ObjectClient) *Chan
 
 // Community is a community model.
 type Community struct {
+	Partial     bool
 	ID          ID
 	Owner       bool
 	Name        string
@@ -594,6 +612,7 @@ func CommunityFromProto(value *protoTypes.Community, clients ...*ObjectClient) *
 
 // CommunityMember is a user's membership in a community.
 type CommunityMember struct {
+	Partial     bool
 	ID          ID
 	CommunityID ID
 	RoleIDs     []ID
@@ -607,7 +626,7 @@ func CommunityMemberFromProto(value *protoTypes.CommunityMember, clients ...*Obj
 	if value == nil {
 		return nil
 	}
-	return &CommunityMember{
+	model := &CommunityMember{
 		ID:          ID(value.GetId()),
 		CommunityID: ID(value.GetCommunityId()),
 		RoleIDs:     idsFromUint64(value.GetRoleIds()),
@@ -615,6 +634,10 @@ func CommunityMemberFromProto(value *protoTypes.CommunityMember, clients ...*Obj
 		Raw:         value,
 		client:      firstObjectClient(clients...),
 	}
+	if model.client != nil {
+		model.User, _ = model.client.managers.Users.Get(model.ID)
+	}
+	return model
 }
 
 // MemberListEntry is one ordered entry returned for a community channel.
@@ -626,13 +649,13 @@ type MemberListEntry struct {
 	Raw      *protoUpdates.MemberListEntry
 }
 
-func MemberListEntryFromProto(value *protoUpdates.MemberListEntry) *MemberListEntry {
+func MemberListEntryFromProto(value *protoUpdates.MemberListEntry, clients ...*ObjectClient) *MemberListEntry {
 	if value == nil {
 		return nil
 	}
 	entry := &MemberListEntry{Raw: value}
 	if user := value.GetUser(); user != nil {
-		entry.User = UserFromProto(user.GetUser())
+		entry.User = UserFromProto(user.GetUser(), clients...)
 		entry.Nickname = cloneString(user.Nickname)
 	}
 	if divider := value.GetDivider(); divider != nil {

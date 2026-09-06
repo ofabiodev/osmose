@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"sync"
 	"time"
@@ -12,6 +13,7 @@ import (
 // oneofs; the client prepares the current Osmium keepalive frame.
 type Keepalive struct {
 	ctx       context.Context
+	cancel    context.CancelFunc
 	interval  time.Duration
 	enqueue   func(context.Context, Frame) error
 	frame     Frame
@@ -27,7 +29,8 @@ func NewKeepalive(ctx context.Context, interval time.Duration, enqueue func(cont
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &Keepalive{ctx: ctx, interval: interval, enqueue: enqueue, frame: frame, logger: logger}
+	ctx, cancel := context.WithCancel(ctx)
+	return &Keepalive{ctx: ctx, cancel: cancel, interval: interval, enqueue: enqueue, frame: frame, logger: logger}
 }
 
 func (k *Keepalive) Start() {
@@ -45,7 +48,10 @@ func (k *Keepalive) Start() {
 				case <-k.ctx.Done():
 					return
 				case <-ticker.C:
-					if err := k.enqueue(k.ctx, k.frame); err != nil && k.ctx.Err() == nil {
+					if err := k.enqueue(k.ctx, k.frame); err != nil {
+						if k.ctx.Err() != nil || errors.Is(err, ErrClosed) {
+							return
+						}
 						k.logger.Warn("keepalive enqueue failed", "error", err)
 					}
 				}
@@ -54,4 +60,9 @@ func (k *Keepalive) Start() {
 	})
 }
 
-func (k *Keepalive) Stop() { k.wg.Wait() }
+func (k *Keepalive) Stop() {
+	if k.cancel != nil {
+		k.cancel()
+	}
+	k.wg.Wait()
+}

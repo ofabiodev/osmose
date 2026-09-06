@@ -20,16 +20,19 @@ client, err := osmose.New(osmose.Config{
 })
 ```
 
-`New` validates the configuration and applies defaults. `Client` exposes these
-services:
+`New` validates the configuration and applies defaults. `Client` exposes entity
+managers directly, plus specialized services for protocol areas without a
+dedicated manager:
 
 | Field | Package | Main operations |
 | --- | --- | --- |
-| `Messages` | `messages` | `Send`, `Reply`, `History`, `Search`, `PinnedMessages`, `UnreadMentions`, `Edit`, `Delete` |
+| `Users` | `types` | `Get`, `Resolve`, `Fetch`, `Lookup`, `Profile`, `List` |
+| `Communities` | `types` | `Get`, `Resolve`, `Fetch`, `List`, `Create`, `Edit`, `Delete` |
+| `Channels` | `types` | Scoped `Get`, `Resolve`, `Fetch`, `List`, `Create`, `Edit`, `Delete` |
+| `Members` | `types` | Scoped `Get`, `Resolve`, `Fetch`, `FetchMany`, `List`, `Create`, `Edit`, `Delete` |
+| `Roles` | `types` | Scoped `Get`, `Resolve`, `Fetch`, `List`, `Create`, `Edit`, `Delete` |
+| `Messages` | `types` | Scoped `Get`, `Resolve`, `Fetch`, `List`, `Create`, `Search`, `PinnedMessages`, `UnreadMentions`, `Edit`, `Delete` |
 | `Chats` | `chats` | `List`, `Get`, `Members`, `SetTyping` |
-| `Communities` | `communities` | `List`, `Channels`, `ChannelMembers` |
-| `Users` | `users` | `Get`, `Profile` |
-| `Reactions` | `reactions` | `Add`, `Remove` |
 | `Voice` | `voice` | `RequestRoom`, `RoomStates`, `DisconnectUser` |
 
 ## Lifecycle
@@ -68,8 +71,8 @@ Registration returns a function that removes that handler.
 | `OnDisconnected` | `ConnectionEvent` after an attempt ends |
 | `OnReconnecting` | `ConnectionEvent` before a retry, with `RetryIn` |
 | `OnConnectionError` / `OnError` | `ConnectionEvent` with `Err` |
-| `OnMessageCreate` | `MessageCreateEvent` |
-| `OnMessageUpdate` | `MessageUpdateEvent` |
+| `OnMessage` | Direct `*types.Message` on create |
+| `OnMessageEdit` | Direct `*types.Message` on update |
 | `OnMessageDelete` | `MessageDeleteEvent` |
 | `OnChannelUpdate` | `ChannelUpdateEvent` |
 | `OnChannelDelete` | `ChannelDeleteEvent` |
@@ -87,7 +90,7 @@ Registration returns a function that removes that handler.
 | `OnVoiceRoomParticipant` | `VoiceRoomParticipantEvent` |
 | `OnUpdate` | `UpdateEvent` with the raw generated update |
 
-Message create and interaction events provide a `Reply(ctx, content)` helper.
+Message objects and interaction events provide a `Reply(ctx, content)` helper.
 Interaction events also provide `Respond`, `Acknowledge`, and `Defer`. Every
 event provides `Client()`. `ConnectionEvent` contains `Attempt`, `State`,
 `RetryIn`, and `Err`.
@@ -100,6 +103,7 @@ Event dispatch is bounded. When the queue is full, the update is dropped so
 the socket reader remains responsive. `Client.DroppedEvents()` returns the
 cumulative count and `Config.OnEventOverflow` receives that count after each
 drop. The overflow callback runs on the socket reader and must not block.
+When caching is enabled, state has already been applied before that delivery drop.
 
 ## Collectors
 
@@ -136,6 +140,7 @@ The `types` package contains small models shared by events and services:
 | --- | --- |
 | `types.ID` | Osmium wire ID with an explicit `Uint64()` conversion. |
 | `types.User` | User identity, username, status, photo, bot flag, and raw value. |
+| `types.UserProfile` | Separate profile metadata such as a user's bio. |
 | `types.Message` | Message ID, chat, author, content, `ReplyInfo`, media, entities, bot info, and raw value. |
 | `types.ChatRef` | Self, user, group, or community channel reference. |
 | `types.ChannelRef` | Community channel reference. |
@@ -175,12 +180,31 @@ access to advanced protocol fields when needed.
 
 `Community`, `Channel`, `Message`, `CommunityMember` (also named `Member`), and
 `CommunityRole` (also named `Role`) can perform common operations directly.
-Objects returned by `Communities`, `Chats`, `Messages`, and typed events are
+Objects returned by managers, `Chats`, and typed events are
 bound to the client automatically. Their methods accept `context.Context` and
 hide request construction; use `Raw` for unsupported protocol operations.
 
 `Message.ReplyInfo` contains reply metadata. It is named `ReplyInfo` because
 `Message.Reply(ctx, content)` is the object reply method.
+
+## Managers and partial objects
+
+`Client` exposes `Users`, `Communities`, `Channels`, `Members`, `Roles`, and
+`Messages` directly as `UserManager`, `CommunityManager`, `ChannelManager`,
+`MemberManager`, `RoleManager`, and `MessageManager`. Use `In(communityID)` for
+channels/members/roles and `In(chatRef)` for messages. Rich objects expose their
+scoped managers through `community.Channels()`, `community.Members()`,
+`community.Roles()`, and `channel.Messages()`.
+
+`Get(id)` returns a cached snapshot and a found flag. `Resolve(ctx, id)` uses a
+complete cache hit, while `Fetch(ctx, id)` always requests fresh data. Network
+operations return errors. `ListCached`, `Invalidate(id)`, and `Clear` perform no
+I/O. See the full [manager operation table](../state-management/#scoped-managers).
+
+`Ref(id)` makes a partial object. All six entity types expose `Partial` and
+`Fetch(ctx) error`; object Fetch refreshes the receiver only on success. Cache
+snapshots are isolated from caller mutations. Services and known raw operations
+share cache synchronization; unsupported raw mutations need manual invalidation.
 
 ## Errors
 
@@ -203,6 +227,9 @@ Use `errors.Is` and `errors.As` instead of matching error strings.
 | `osmose.ErrCollectorOverflow` | A collector buffer filled before it was consumed. |
 | `osmose.ErrCollectorClosed` | The client closed while the collector was active. |
 | `osmose.ErrEventQueueFull` | The bounded event queue could not accept an update. |
+| `types.ErrNotFound` | A valid response did not contain the requested entity. |
+| `types.ErrIncompleteObject` | An operation needs complete object data. |
+| `types.ErrObjectClientUnavailable` | A rich object is not bound to a usable client. |
 
 ```go
 if errors.Is(err, osmose.ErrPermanent) {
@@ -219,7 +246,7 @@ if errors.As(err, &rpcErr) {
 
 ## Raw API
 
-When a high-level service does not cover an endpoint, call it with a generated
+When the high-level API does not cover an endpoint, call it with a generated
 protobuf request:
 
 ```go
@@ -233,7 +260,8 @@ if err != nil {
 communities := result.GetCommunities()
 ```
 
-The raw API is intentionally separate from the common service API. Request
+The raw API is intentionally separate from the common managers, objects, and
+specialized services. Request
 wrapping is generated and runtime dispatch does not use reflection.
 
 ## Configuration
@@ -245,6 +273,7 @@ wrapping is generated and runtime dispatch does not use reflection.
 | `ServerURL` | Override the Osmium WebSocket endpoint. |
 | `Logger` | Set a `log/slog` logger. |
 | `RequestTimeout` | Default timeout for RPC calls. |
+| `Cache` | Opt-in `CacheConfig`: `Enabled`, `TTL`, and limits for `Users`, `Communities`, `Channels`, `Members`, `Roles`, `Messages`. |
 | `HeartbeatInterval` | Keepalive interval. |
 | `EventQueue`, `EventWorkers` | Bounded event dispatch capacity. `EventWorkers` defaults to one for predictable ordering. |
 | `OnHandlerError` | Observe errors and panics returned by event handlers. |

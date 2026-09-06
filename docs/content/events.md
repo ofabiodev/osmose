@@ -14,15 +14,32 @@ client.OnReady(func(_ context.Context, event *osmose.ReadyEvent) error {
 	return nil
 })
 
-client.OnMessageCreate(func(ctx context.Context, event *osmose.MessageCreateEvent) error {
-	if event.Message.Content == "!ping" {
-		return event.Reply(ctx, "Pong!")
+client.OnMessage(func(ctx context.Context, message *types.Message) error {
+	if message.Content == "!ping" {
+		_, err := message.Reply(ctx, "Pong!")
+		return err
 	}
 	return nil
 })
 ```
 
 ## Available events
+
+`OnMessage` receives the created rich message directly. `OnMessageEdit` receives
+the updated rich message:
+
+```go
+client.OnMessageEdit(func(ctx context.Context, message *types.Message) error {
+	if message.Author != nil && message.Author.Bot {
+		return nil
+	}
+	log.Printf("message %d changed", message.ID)
+	return nil
+})
+```
+
+Both handlers preserve contexts, handler error/panic reporting, and unsubscribe
+behavior. Import `github.com/ofabiodev/osmose/types` for the model.
 
 | Handler | Event |
 | --- | --- |
@@ -32,8 +49,8 @@ client.OnMessageCreate(func(ctx context.Context, event *osmose.MessageCreateEven
 | `OnDisconnected` | A connection attempt or active connection ended |
 | `OnReconnecting` | The client is waiting before another connection attempt |
 | `OnConnectionError` / `OnError` | A connection attempt failed |
-| `OnMessageCreate` | A message was created |
-| `OnMessageUpdate` | A message was updated |
+| `OnMessage` | A created rich `*types.Message` |
+| `OnMessageEdit` | An updated rich `*types.Message` |
 | `OnMessageDelete` | One or more messages were deleted |
 | `OnChannelUpdate` | A community channel was updated |
 | `OnChannelDelete` | A community channel was deleted |
@@ -55,16 +72,20 @@ Every handler receives a `context.Context` and returns an `error`. Registration
 returns a removal function:
 
 ```go
-remove := client.OnMessageUpdate(handler)
+remove := client.OnMessageEdit(handler)
 defer remove()
 ```
 
-Message events expose `Message`, `Author`, `Client()`, and `Reply(...)` where
-appropriate. Interaction events expose the typed `Interaction` model,
+Message handlers receive the message itself, including `Author` and `Reply(...)`.
+Interaction events expose the typed `Interaction` model,
 `Respond`, `Reply`, `Acknowledge`, and `Defer`. The underlying protobuf value
 remains available through `Raw` on the model. Event payload fields are derived
 from the current Osmium update types, so absent optional protocol fields remain
 nil where relevant.
+
+ID-only user, community, and member events expose bound partial objects when
+their IDs are available. Check `Partial` and use `Fetch(ctx)` when more data is
+needed. A member's roles are never inferred from the users in a member-list event.
 
 Connection events use `ConnectionEvent`:
 
@@ -91,6 +112,12 @@ is full, the update is dropped and logged so the client stays responsive.
 `Client.DroppedEvents()` exposes the cumulative drop count and
 `Config.OnEventOverflow` can report it to application metrics or alerts. Keep
 the overflow callback short.
+
+With caching enabled, gateway state is synchronized **before** handler queueing,
+even for dropped deliveries. No handler registration is required to maintain the
+cache. Handlers receive snapshots; managers may already reflect newer events.
+The current schema has no role update/delete event, so external role changes
+require explicit fetching or cache expiry. See [state management](../state-management/).
 
 For waiting on messages inside a confirmation or form flow, use the typed
 [message collector](../collectors/) instead of managing a temporary handler by

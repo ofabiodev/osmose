@@ -9,10 +9,18 @@ import (
 	"github.com/ofabiodev/osmose/collectors"
 	"github.com/ofabiodev/osmose/events"
 	coreclient "github.com/ofabiodev/osmose/internal/client"
+	"github.com/ofabiodev/osmose/types"
 )
 
 type Client = coreclient.Client
 type Config = coreclient.Config
+type CacheConfig = types.CacheConfig
+type UserManager = types.UserManager
+type CommunityManager = types.CommunityManager
+type ChannelManager = types.ChannelManager
+type MemberManager = types.MemberManager
+type RoleManager = types.RoleManager
+type MessageManager = types.MessageManager
 type RawClient = coreclient.RawClient
 
 func New(config Config) (*Client, error) { return coreclient.New(config) }
@@ -35,8 +43,8 @@ type UnexpectedResultError = coreclient.UnexpectedResultError
 func IsPermanent(err error) bool { return coreclient.IsPermanent(err) }
 
 type ReadyHandler = events.ReadyHandler
-type MessageCreateHandler = events.MessageCreateHandler
-type MessageUpdateHandler = events.MessageUpdateHandler
+type MessageHandler = events.MessageHandler
+type MessageEditHandler = events.MessageEditHandler
 type MessageDeleteHandler = events.MessageDeleteHandler
 type MemberCreateHandler = events.MemberCreateHandler
 type ChannelUpdateHandler = events.ChannelUpdateHandler
@@ -59,8 +67,6 @@ type HandlerErrorHandler = events.HandlerErrorHandler
 type EventOverflowHandler = events.EventOverflowHandler
 type ConnectionEvent = events.ConnectionEvent
 type ReadyEvent = events.ReadyEvent
-type MessageCreateEvent = events.MessageCreateEvent
-type MessageUpdateEvent = events.MessageUpdateEvent
 type MessageDeleteEvent = events.MessageDeleteEvent
 type MemberCreateEvent = events.MemberCreateEvent
 type ChannelUpdateEvent = events.ChannelUpdateEvent

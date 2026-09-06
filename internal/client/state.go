@@ -2,7 +2,7 @@ package client
 
 import "github.com/ofabiodev/osmose/events"
 
-// State is kept as an alias for compatibility with the root client API.
+// State describes the client's connection lifecycle.
 type State = events.State
 
 const (

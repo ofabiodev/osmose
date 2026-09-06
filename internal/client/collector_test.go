@@ -49,8 +49,8 @@ func TestMessageCollectorFiltersAndStopsAtMax(t *testing.T) {
 		AuthorID: 7,
 		Max:      2,
 		Buffer:   2,
-		Filter: func(event *MessageCreateEvent) bool {
-			return event.Message.Content == "keep"
+		Filter: func(message *types.Message) bool {
+			return message.Content == "keep"
 		},
 	})
 	if err != nil {
@@ -125,8 +125,8 @@ func TestMessageCollectorReportsOverflow(t *testing.T) {
 	if result.Reason != EndReasonOverflow || !errors.Is(result.Err, ErrCollectorOverflow) || result.Collected != 1 {
 		t.Fatalf("unexpected overflow result: %#v", result)
 	}
-	if event, ok := <-collector.Events(); !ok || event.Message.Content != "first" {
-		t.Fatalf("buffered event was lost: %#v, %v", event, ok)
+	if message, ok := <-collector.Events(); !ok || message.Content != "first" {
+		t.Fatalf("buffered message was lost: %#v, %v", message, ok)
 	}
 	if _, ok := <-collector.Events(); ok {
 		t.Fatal("collector events channel remained open")
@@ -142,7 +142,7 @@ func TestAwaitMessageUsesContextAndRemovesHandler(t *testing.T) {
 		t.Fatalf("unexpected await error: %v", err)
 	}
 	client.events.mu.RLock()
-	handlers := len(client.events.messageCreate)
+	handlers := len(client.events.message)
 	client.events.mu.RUnlock()
 	if handlers != 0 {
 		t.Fatalf("collector handler was not removed: %d", handlers)
@@ -185,7 +185,7 @@ func TestMessageCollectorStopsWithClient(t *testing.T) {
 		t.Fatalf("unexpected collector result: %#v", result)
 	}
 	client.events.mu.RLock()
-	handlers := len(client.events.messageCreate)
+	handlers := len(client.events.message)
 	client.events.mu.RUnlock()
 	if handlers != 0 {
 		t.Fatalf("collector handler was not removed: %d", handlers)

@@ -11,17 +11,14 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/ofabiodev/osmose/chats"
-	"github.com/ofabiodev/osmose/communities"
 	"github.com/ofabiodev/osmose/internal/gateway"
 	"github.com/ofabiodev/osmose/internal/rpc"
 	"github.com/ofabiodev/osmose/internal/scheduler"
-	"github.com/ofabiodev/osmose/messages"
 	"github.com/ofabiodev/osmose/proto/auth"
 	"github.com/ofabiodev/osmose/proto/core"
 	protoMessages "github.com/ofabiodev/osmose/proto/messages"
-	"github.com/ofabiodev/osmose/reactions"
+	"github.com/ofabiodev/osmose/proto/updates"
 	"github.com/ofabiodev/osmose/types"
-	"github.com/ofabiodev/osmose/users"
 	"github.com/ofabiodev/osmose/voice"
 	"google.golang.org/protobuf/proto"
 )
@@ -33,19 +30,22 @@ type activeConnection struct {
 	cancel context.CancelFunc
 }
 
-// Client is the central Osmose client. Services are initialized and ready to
-// use immediately; network operations wait until Run has completed auth.
+// Client is the central Osmose client. Managers and specialized services are
+// initialized and ready to use immediately; network operations wait until Run
+// has completed auth.
 // A client has one lifecycle: reconnects happen inside Run, and a completed
 // Run cannot be started again.
 type Client struct {
 	config Config
 	logger *slog.Logger
 
-	Messages    *messages.Service
+	Users       *types.UserManager
+	Communities *types.CommunityManager
+	Channels    *types.ChannelManager
+	Members     *types.MemberManager
+	Roles       *types.RoleManager
+	Messages    *types.MessageManager
 	Chats       *chats.Service
-	Communities *communities.Service
-	Users       *users.Service
-	Reactions   *reactions.Service
 	Voice       *voice.Service
 
 	events       *eventDispatcher
@@ -80,14 +80,14 @@ type Client struct {
 }
 
 // RawClient is the escape hatch for generated protobuf requests not wrapped by
-// a high-level service yet.
+// the high-level API yet.
 type RawClient struct{ client *Client }
 
 func (r *RawClient) Call(ctx context.Context, request proto.Message) (*core.RPCResult, error) {
 	if r == nil || r.client == nil {
 		return nil, ErrClosed
 	}
-	return r.client.call(ctx, request)
+	return r.client.objectClient.Call(ctx, request)
 }
 
 func New(config Config) (*Client, error) {
@@ -111,13 +111,15 @@ func New(config Config) (*Client, error) {
 	c.events.onEventOverflow = config.OnEventOverflow
 	c.events.setClient(c)
 	c.raw = &RawClient{client: c}
-	c.objectClient = types.NewObjectClient(c.call)
-	c.Messages = messages.New(c.call)
-	c.Chats = chats.New(c.call)
-	c.Communities = communities.New(c.call)
-	c.Users = users.New(c.call)
-	c.Reactions = reactions.New(c.call)
-	c.Voice = voice.New(c.call)
+	c.objectClient = types.NewObjectClient(c.call, config.Cache)
+	c.Users = c.objectClient.UserManager()
+	c.Communities = c.objectClient.CommunityManager()
+	c.Channels = c.objectClient.ChannelManager()
+	c.Members = c.objectClient.MemberManager()
+	c.Roles = c.objectClient.RoleManager()
+	c.Messages = c.objectClient.MessageManager()
+	c.Chats = chats.New(c.objectClient.Call, c.objectClient)
+	c.Voice = voice.New(c.objectClient.Call)
 	return c, nil
 }
 
@@ -136,6 +138,13 @@ func (c *Client) User() *types.User {
 func (c *Client) SessionID() types.ID { return types.ID(c.sessionID.Load()) }
 
 func (c *Client) Raw() *RawClient { return c.raw }
+
+// ClearCache discards all cached entities and fences off in-flight reads.
+func (c *Client) ClearCache() {
+	if c != nil && c.objectClient != nil {
+		c.objectClient.ClearCache()
+	}
+}
 
 // Done closes after the client's run and shutdown cleanup have completed.
 func (c *Client) Done() <-chan struct{} {
@@ -384,7 +393,8 @@ func (c *Client) runConnection(root context.Context, attempt int) (bool, error) 
 	if authorization == nil || authorization.GetUser() == nil {
 		return false, permanentError(ErrProtocolMismatch, &UnexpectedResultError{Method: "auth.authorize"})
 	}
-	user := types.UserFromProto(authorization.GetUser())
+	user := types.UserFromProto(authorization.GetUser(), c.objectClient)
+	c.objectClient.ApplyUpdate(&updates.Update{Update: &updates.Update_User{User: &updates.UpdateUser{UserId: authorization.GetUser().GetId(), User: authorization.GetUser()}}})
 	c.userMu.Lock()
 	c.user = user
 	c.userMu.Unlock()
@@ -489,6 +499,7 @@ func (c *Client) handleFrame(active *activeConnection, data []byte) {
 		return
 	}
 	if update := serverMessage.GetUpdate(); update != nil {
+		c.objectClient.ApplyUpdate(update)
 		if err := c.events.enqueue(active.ctx, update); err != nil && active.ctx.Err() == nil {
 			c.logger.Warn("event queue enqueue failed", "error", err)
 		}
@@ -502,6 +513,7 @@ func (c *Client) cleanupActive(active *activeConnection) {
 	active.broker.FailAll(ErrDisconnected)
 	active.conn.Close()
 	active.conn.Wait()
+	c.objectClient.ClearCache()
 	c.activeMu.Lock()
 	if c.active == active {
 		c.active = nil

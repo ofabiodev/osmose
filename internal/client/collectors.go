@@ -6,6 +6,7 @@ import (
 
 	"github.com/ofabiodev/osmose/collectors"
 	"github.com/ofabiodev/osmose/events"
+	"github.com/ofabiodev/osmose/types"
 )
 
 type EndReason = collectors.EndReason
@@ -57,8 +58,8 @@ func (c *Client) collectMessages(ctx context.Context, options MessageCollectorOp
 	if err != nil {
 		return nil, err
 	}
-	return collectors.NewMessages(ctx, lifecycleCtx, options, func(handler func(context.Context, *events.MessageCreateEvent) error) func() {
-		return c.OnMessageCreate(handler)
+	return collectors.NewMessages(ctx, lifecycleCtx, options, func(handler func(context.Context, *types.Message) error) func() {
+		return c.OnMessage(handler)
 	})
 }
 
@@ -76,7 +77,7 @@ func (c *Client) CollectMessagesContext(ctx context.Context, options MessageColl
 
 // AwaitMessage waits for the first message matching options. Its Max value is
 // always one; use CollectMessages when multiple messages are needed.
-func (c *Client) AwaitMessage(ctx context.Context, options MessageCollectorOptions) (*MessageCreateEvent, error) {
+func (c *Client) AwaitMessage(ctx context.Context, options MessageCollectorOptions) (*types.Message, error) {
 	if options.Max < 0 {
 		return nil, fmt.Errorf("collector max cannot be negative")
 	}

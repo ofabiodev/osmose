@@ -3,6 +3,7 @@ package client
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/ofabiodev/osmose/events"
 	"github.com/ofabiodev/osmose/internal/rpc"
@@ -72,11 +73,20 @@ func (e *RPCError) Error() string {
 // from the one defined for the requested method.
 type UnexpectedResultError = rpc.UnexpectedResultError
 
-// Osmium currently uses code 403 when the Authorize request is rejected.
-// Keep this classification narrow: other RPC errors may be transient.
-const authorizationRejectedCode uint32 = 403
+// Osmium may report a rejected Authorize request with an HTTP-like code or
+// with code 0 and the message "Unauthorized". Neither case is recoverable
+// without changing the token, so Client.Run must not reconnect forever.
+const (
+	authorizationUnauthorizedCode uint32 = 401
+	authorizationForbiddenCode    uint32 = 403
+)
 
 func isPermanentAuthorizationError(err error) bool {
 	var rpcErr *RPCError
-	return errors.As(err, &rpcErr) && rpcErr.Code == authorizationRejectedCode
+	if !errors.As(err, &rpcErr) {
+		return false
+	}
+	return rpcErr.Code == authorizationUnauthorizedCode ||
+		rpcErr.Code == authorizationForbiddenCode ||
+		strings.EqualFold(strings.TrimSpace(rpcErr.Message), "unauthorized")
 }

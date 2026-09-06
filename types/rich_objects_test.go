@@ -73,15 +73,15 @@ func TestCommunityObjectsLoadRelatedRichObjects(t *testing.T) {
 	})
 
 	community := CommunityFromProto(&protoTypes.Community{Id: 10, Name: "Osmium"}, client)
-	channels, err := community.Channels(context.Background())
+	channels, err := community.Channels().List(context.Background())
 	if err != nil || len(channels) != 1 || channels[0].Name != "general" {
 		t.Fatalf("channels=%#v err=%v", channels, err)
 	}
-	members, err := community.Members(context.Background())
+	members, err := community.Members().List(context.Background())
 	if err != nil || len(members) != 1 || members[0].User == nil || members[0].User.Username != "member" {
 		t.Fatalf("members=%#v err=%v", members, err)
 	}
-	roles, err := community.Roles(context.Background())
+	roles, err := community.Roles().List(context.Background())
 	if err != nil || len(roles) != 1 || roles[0].Name != "moderator" {
 		t.Fatalf("roles=%#v err=%v", roles, err)
 	}
