@@ -13,7 +13,7 @@ func (o *User) Fetch(ctx context.Context) error {
 	if err := requireObjectClient(o.client); err != nil {
 		return err
 	}
-	value, err := o.client.Managers().Users.Fetch(ctx, o.ID)
+	value, err := o.client.managers.Users.Fetch(ctx, o.ID)
 	if err != nil {
 		return err
 	}
@@ -24,6 +24,17 @@ func (o *User) Fetch(ctx context.Context) error {
 	return nil
 }
 
+// Profile fetches profile metadata for this user.
+func (o *User) Profile(ctx context.Context) (*UserProfile, error) {
+	if o == nil {
+		return nil, ErrObjectClientUnavailable
+	}
+	if err := requireObjectClient(o.client); err != nil {
+		return nil, err
+	}
+	return o.client.managers.Users.Profile(ctx, o.ID)
+}
+
 func (o *Community) Fetch(ctx context.Context) error {
 	if o == nil {
 		return ErrObjectClientUnavailable
@@ -31,7 +42,7 @@ func (o *Community) Fetch(ctx context.Context) error {
 	if err := requireObjectClient(o.client); err != nil {
 		return err
 	}
-	value, err := o.client.Managers().Communities.Fetch(ctx, o.ID)
+	value, err := o.client.managers.Communities.Fetch(ctx, o.ID)
 	if err != nil {
 		return err
 	}
@@ -49,7 +60,7 @@ func (o *Channel) Fetch(ctx context.Context) error {
 	if err := requireObjectClient(o.client); err != nil {
 		return err
 	}
-	value, err := o.client.Managers().Channels.In(o.CommunityID).Fetch(ctx, o.ID)
+	value, err := o.client.managers.Channels.In(o.CommunityID).Fetch(ctx, o.ID)
 	if err != nil {
 		return err
 	}
@@ -67,7 +78,7 @@ func (o *CommunityMember) Fetch(ctx context.Context) error {
 	if err := requireObjectClient(o.client); err != nil {
 		return err
 	}
-	value, err := o.client.Managers().Members.In(o.CommunityID).Fetch(ctx, o.ID)
+	value, err := o.client.managers.Members.In(o.CommunityID).Fetch(ctx, o.ID)
 	if err != nil {
 		return err
 	}
@@ -85,7 +96,7 @@ func (o *CommunityRole) Fetch(ctx context.Context) error {
 	if err := requireObjectClient(o.client); err != nil {
 		return err
 	}
-	value, err := o.client.Managers().Roles.In(o.CommunityID).Fetch(ctx, o.ID)
+	value, err := o.client.managers.Roles.In(o.CommunityID).Fetch(ctx, o.ID)
 	if err != nil {
 		return err
 	}
@@ -103,7 +114,7 @@ func (o *Message) Fetch(ctx context.Context) error {
 	if err := requireObjectClient(o.client); err != nil {
 		return err
 	}
-	value, err := o.client.Managers().Messages.In(o.Chat).Fetch(ctx, o.ID)
+	value, err := o.client.managers.Messages.In(o.Chat).Fetch(ctx, o.ID)
 	if err != nil {
 		return err
 	}
@@ -130,10 +141,10 @@ func (m *Message) Community() *Community {
 	if m == nil || m.client == nil || m.Chat.CommunityID == 0 {
 		return nil
 	}
-	if c, ok := m.client.Managers().Communities.Get(m.Chat.CommunityID); ok {
+	if c, ok := m.client.managers.Communities.Get(m.Chat.CommunityID); ok {
 		return c
 	}
-	return m.client.Managers().Communities.Ref(m.Chat.CommunityID)
+	return m.client.managers.Communities.Ref(m.Chat.CommunityID)
 }
 
 // Channel returns a cached channel or a partial reference without a network call.
@@ -141,7 +152,7 @@ func (m *Message) Channel() *Channel {
 	if m == nil || m.client == nil || m.Chat.ChannelID == 0 {
 		return nil
 	}
-	manager := m.client.Managers().Channels.In(m.Chat.CommunityID)
+	manager := m.client.managers.Channels.In(m.Chat.CommunityID)
 	if c, ok := manager.Get(m.Chat.ChannelID); ok {
 		return c
 	}
@@ -154,7 +165,7 @@ func (m *Message) Member() *Member {
 	if m == nil || m.client == nil || m.Chat.CommunityID == 0 || m.AuthorID == 0 {
 		return nil
 	}
-	manager := m.client.Managers().Members.In(m.Chat.CommunityID)
+	manager := m.client.managers.Members.In(m.Chat.CommunityID)
 	if member, ok := manager.Get(m.AuthorID); ok {
 		return member
 	}

@@ -54,6 +54,26 @@ func (m *UserManager) Lookup(ctx context.Context, username string) (*User, error
 	return UserFromProto(result.GetUserDetails().GetUser(), m.client), nil
 }
 
+// Profile fetches profile metadata for a user. Profile data is separate from
+// the identity returned by Fetch and Lookup.
+func (m *UserManager) Profile(ctx context.Context, id ID) (*UserProfile, error) {
+	if m == nil {
+		return nil, ErrObjectClientUnavailable
+	}
+	if err := m.validate(id); err != nil {
+		return nil, err
+	}
+	result, err := callObject(m.client, ctx, &protoUsers.GetProfile{Ref: UserRef{ID: id}.ToProto()})
+	if err != nil {
+		return nil, err
+	}
+	value := result.GetProfile()
+	if value == nil {
+		return nil, &rpc.UnexpectedResultError{Method: "users.getProfile"}
+	}
+	return &UserProfile{Ref: UserRef{ID: id}, Bio: value.GetBio(), Raw: value}, nil
+}
+
 // List returns known cached users. The protocol has no global user list or
 // bot API for creating, editing or deleting arbitrary user accounts.
 func (m *UserManager) List() []*User { return m.ListCached() }
@@ -292,9 +312,77 @@ func (m *MessageManager) List(ctx context.Context, params ...MessageHistoryParam
 	if len(params) == 1 {
 		p = params[0]
 	}
-	p.Chat = m.chat
+	if m.chat.Valid() {
+		p.Chat = m.chat
+	}
 	return getMessageHistory(ctx, m.client, p)
 }
+
+// Search finds messages using the manager's chat scope when one is set.
+func (m *MessageManager) Search(ctx context.Context, params MessageSearchParams) (*MessageHistory, error) {
+	if m == nil {
+		return nil, ErrObjectClientUnavailable
+	}
+	if err := requireObjectClient(m.client); err != nil {
+		return nil, err
+	}
+	if m.chat.Valid() {
+		params.Chat = m.chat
+		params.Scoped = true
+	}
+	return searchMessages(ctx, m.client, params)
+}
+
+// PinnedMessages returns pinned messages in the manager's chat scope.
+func (m *MessageManager) PinnedMessages(ctx context.Context) (*MessageHistory, error) {
+	if m == nil {
+		return nil, ErrObjectClientUnavailable
+	}
+	if err := requireObjectClient(m.client); err != nil {
+		return nil, err
+	}
+	chat, err := m.chat.ToProto()
+	if err != nil {
+		return nil, err
+	}
+	result, err := callObject(m.client, ctx, &protoMessages.GetPinnedMessages{ChatRef: chat})
+	if err != nil {
+		return nil, err
+	}
+	value := result.GetMessages()
+	if value == nil {
+		return nil, &rpc.UnexpectedResultError{Method: "messages.getPinnedMessages"}
+	}
+	return messageHistoryFromProto(value, m.client), nil
+}
+
+// UnreadMentions returns unread mention IDs in the manager's chat scope.
+func (m *MessageManager) UnreadMentions(ctx context.Context) ([]ID, error) {
+	if m == nil {
+		return nil, ErrObjectClientUnavailable
+	}
+	if err := requireObjectClient(m.client); err != nil {
+		return nil, err
+	}
+	chat, err := m.chat.ToProto()
+	if err != nil {
+		return nil, err
+	}
+	result, err := callObject(m.client, ctx, &protoMessages.GetUnreadMentions{ChatRef: chat})
+	if err != nil {
+		return nil, err
+	}
+	value := result.GetUnreadMentions()
+	if value == nil {
+		return nil, &rpc.UnexpectedResultError{Method: "messages.getUnreadMentions"}
+	}
+	ids := make([]ID, len(value.GetMessageIds()))
+	for i, id := range value.GetMessageIds() {
+		ids[i] = ID(id)
+	}
+	return ids, nil
+}
+
 func (m *MessageManager) Create(ctx context.Context, content string) (*Message, error) {
 	return m.CreateWith(ctx, MessageSendParams{Content: content})
 }

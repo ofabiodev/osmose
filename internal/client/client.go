@@ -11,18 +11,14 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/ofabiodev/osmose/chats"
-	"github.com/ofabiodev/osmose/communities"
 	"github.com/ofabiodev/osmose/internal/gateway"
 	"github.com/ofabiodev/osmose/internal/rpc"
 	"github.com/ofabiodev/osmose/internal/scheduler"
-	"github.com/ofabiodev/osmose/messages"
 	"github.com/ofabiodev/osmose/proto/auth"
 	"github.com/ofabiodev/osmose/proto/core"
 	protoMessages "github.com/ofabiodev/osmose/proto/messages"
 	"github.com/ofabiodev/osmose/proto/updates"
-	"github.com/ofabiodev/osmose/reactions"
 	"github.com/ofabiodev/osmose/types"
-	"github.com/ofabiodev/osmose/users"
 	"github.com/ofabiodev/osmose/voice"
 	"google.golang.org/protobuf/proto"
 )
@@ -34,22 +30,23 @@ type activeConnection struct {
 	cancel context.CancelFunc
 }
 
-// Client is the central Osmose client. Services are initialized and ready to
-// use immediately; network operations wait until Run has completed auth.
+// Client is the central Osmose client. Managers and specialized services are
+// initialized and ready to use immediately; network operations wait until Run
+// has completed auth.
 // A client has one lifecycle: reconnects happen inside Run, and a completed
 // Run cannot be started again.
 type Client struct {
 	config Config
 	logger *slog.Logger
 
-	Messages    *messages.Service
+	Users       *types.UserManager
+	Communities *types.CommunityManager
+	Channels    *types.ChannelManager
+	Members     *types.MemberManager
+	Roles       *types.RoleManager
+	Messages    *types.MessageManager
 	Chats       *chats.Service
-	Communities *communities.Service
-	Users       *users.Service
-	Reactions   *reactions.Service
 	Voice       *voice.Service
-	// Managers are the primary API for stateful rich objects.
-	Managers *types.Managers
 
 	events       *eventDispatcher
 	raw          *RawClient
@@ -83,7 +80,7 @@ type Client struct {
 }
 
 // RawClient is the escape hatch for generated protobuf requests not wrapped by
-// a high-level service yet.
+// the high-level API yet.
 type RawClient struct{ client *Client }
 
 func (r *RawClient) Call(ctx context.Context, request proto.Message) (*core.RPCResult, error) {
@@ -115,12 +112,13 @@ func New(config Config) (*Client, error) {
 	c.events.setClient(c)
 	c.raw = &RawClient{client: c}
 	c.objectClient = types.NewObjectClient(c.call, config.Cache)
-	c.Managers = c.objectClient.Managers()
-	c.Messages = messages.New(c.objectClient.Call, c.objectClient)
+	c.Users = c.objectClient.UserManager()
+	c.Communities = c.objectClient.CommunityManager()
+	c.Channels = c.objectClient.ChannelManager()
+	c.Members = c.objectClient.MemberManager()
+	c.Roles = c.objectClient.RoleManager()
+	c.Messages = c.objectClient.MessageManager()
 	c.Chats = chats.New(c.objectClient.Call, c.objectClient)
-	c.Communities = communities.New(c.objectClient.Call, c.objectClient)
-	c.Users = users.New(c.objectClient.Call, c.objectClient)
-	c.Reactions = reactions.New(c.objectClient.Call)
 	c.Voice = voice.New(c.objectClient.Call)
 	return c, nil
 }
@@ -140,6 +138,13 @@ func (c *Client) User() *types.User {
 func (c *Client) SessionID() types.ID { return types.ID(c.sessionID.Load()) }
 
 func (c *Client) Raw() *RawClient { return c.raw }
+
+// ClearCache discards all cached entities and fences off in-flight reads.
+func (c *Client) ClearCache() {
+	if c != nil && c.objectClient != nil {
+		c.objectClient.ClearCache()
+	}
+}
 
 // Done closes after the client's run and shutdown cleanup have completed.
 func (c *Client) Done() <-chan struct{} {

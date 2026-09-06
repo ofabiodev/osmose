@@ -20,26 +20,25 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// ObjectClient is the private call boundary attached to models returned by
-// services. Rich object methods use it to keep protocol details out of bot
-// code while preserving Raw for callers that need the escape hatch.
+// ObjectClient is the private call boundary attached to models returned by the
+// high-level API. Rich object methods use it to keep protocol details out of
+// bot code while preserving Raw for callers that need the escape hatch.
 type ObjectClient struct {
 	call     func(context.Context, proto.Message) (*core.RPCResult, error)
 	cache    *state.Cache
 	flightMu sync.Mutex
 	flights  map[string]*objectFlight
-	managers *Managers
+	managers *managerSet
 }
 
-// NewObjectClient binds rich models to an Osmium call function. It is mainly
-// used by Osmose services and is not needed when using the root Client.
+// NewObjectClient binds rich models to an Osmium call function and cache.
 func NewObjectClient(call func(context.Context, proto.Message) (*core.RPCResult, error), configs ...CacheConfig) *ObjectClient {
 	var config CacheConfig
 	if len(configs) != 0 {
 		config = configs[0]
 	}
 	c := &ObjectClient{call: call, cache: state.New(config), flights: make(map[string]*objectFlight)}
-	c.managers = newManagers(c)
+	c.managers = newManagerSet(c)
 	return c
 }
 
@@ -313,7 +312,7 @@ func (c *Community) listMembers(ctx context.Context, memberIDs ...ID) ([]*Member
 			}
 			model.User = users[model.ID]
 			if model.User == nil {
-				model.User, _ = c.client.Managers().Users.Get(model.ID)
+				model.User, _ = c.client.managers.Users.Get(model.ID)
 			}
 		}
 		members = append(members, model)
@@ -531,52 +530,17 @@ func (c *Channel) channelRef() (ChannelRef, error) {
 
 // Send sends a message to the channel and returns a usable message object.
 func (c *Channel) Send(ctx context.Context, params MessageSendParams) (*Message, error) {
-	ref, err := c.channelRef()
-	if err != nil {
-		return nil, err
-	}
-	return sendMessage(ctx, c.client, ChannelChat(ref.CommunityID, ref.ChannelID), params)
-}
-
-func (c *Channel) history(ctx context.Context, params MessageHistoryParams) (*MessageHistory, error) {
-	ref, err := c.channelRef()
-	if err != nil {
-		return nil, err
-	}
-	params.Chat = ChannelChat(ref.CommunityID, ref.ChannelID)
-	return getMessageHistory(ctx, c.client, params)
+	return c.Messages().CreateWith(ctx, params)
 }
 
 // PinnedMessages returns the pinned messages in the channel.
 func (c *Channel) PinnedMessages(ctx context.Context) (*MessageHistory, error) {
-	ref, err := c.channelRef()
-	if err != nil {
-		return nil, err
-	}
-	chat, err := refChat(ref)
-	if err != nil {
-		return nil, err
-	}
-	result, err := callObject(c.client, ctx, &protoMessages.GetPinnedMessages{ChatRef: chat})
-	if err != nil {
-		return nil, err
-	}
-	value := result.GetMessages()
-	if value == nil {
-		return nil, &rpc.UnexpectedResultError{Method: "messages.getPinnedMessages"}
-	}
-	return messageHistoryFromProto(value, c.client), nil
+	return c.Messages().PinnedMessages(ctx)
 }
 
 // Search finds messages in this channel.
 func (c *Channel) Search(ctx context.Context, params MessageSearchParams) (*MessageHistory, error) {
-	ref, err := c.channelRef()
-	if err != nil {
-		return nil, err
-	}
-	params.Chat = ChannelChat(ref.CommunityID, ref.ChannelID)
-	params.Scoped = true
-	return searchMessages(ctx, c.client, params)
+	return c.Messages().Search(ctx, params)
 }
 
 // Members returns the ordered member list visible in the channel.

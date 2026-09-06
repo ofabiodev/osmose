@@ -18,8 +18,8 @@ var (
 	ErrIncompleteObject = errors.New("object is incomplete")
 )
 
-// Managers share one client-owned cache. Scoped managers are inexpensive views.
-type Managers struct {
+// managerSet owns the client-wide managers. Scoped managers are inexpensive views.
+type managerSet struct {
 	Users       *UserManager
 	Communities *CommunityManager
 	Channels    *ChannelManager
@@ -28,8 +28,8 @@ type Managers struct {
 	Messages    *MessageManager
 }
 
-func newManagers(c *ObjectClient) *Managers {
-	return &Managers{
+func newManagerSet(c *ObjectClient) *managerSet {
+	return &managerSet{
 		Users:       &UserManager{managerCore{client: c, kind: state.User}},
 		Communities: &CommunityManager{managerCore{client: c, kind: state.Community}},
 		Channels:    &ChannelManager{managerCore{client: c, kind: state.Channel}},
@@ -39,13 +39,46 @@ func newManagers(c *ObjectClient) *Managers {
 	}
 }
 
-func (c *ObjectClient) Managers() *Managers { return c.managers }
-
-// Clear discards every cached entity and fences off pending cache fills.
-func (m *Managers) Clear() {
-	if m != nil && m.Users != nil {
-		m.Users.client.ClearCache()
+func (c *ObjectClient) UserManager() *UserManager {
+	if c == nil || c.managers == nil {
+		return nil
 	}
+	return c.managers.Users
+}
+
+func (c *ObjectClient) CommunityManager() *CommunityManager {
+	if c == nil || c.managers == nil {
+		return nil
+	}
+	return c.managers.Communities
+}
+
+func (c *ObjectClient) ChannelManager() *ChannelManager {
+	if c == nil || c.managers == nil {
+		return nil
+	}
+	return c.managers.Channels
+}
+
+func (c *ObjectClient) MemberManager() *MemberManager {
+	if c == nil || c.managers == nil {
+		return nil
+	}
+	return c.managers.Members
+}
+
+func (c *ObjectClient) RoleManager() *RoleManager {
+	if c == nil || c.managers == nil {
+		return nil
+	}
+	return c.managers.Roles
+}
+
+func (c *ObjectClient) MessageManager() *MessageManager {
+	if c == nil || c.managers == nil {
+		return nil
+	}
+	return c.managers.Messages
 }
 
 type managerCore struct {

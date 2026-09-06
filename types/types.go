@@ -11,6 +11,7 @@ import (
 	protoRefs "github.com/ofabiodev/osmose/proto/refs"
 	protoTypes "github.com/ofabiodev/osmose/proto/types"
 	protoUpdates "github.com/ofabiodev/osmose/proto/updates"
+	protoUsers "github.com/ofabiodev/osmose/proto/users"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -93,6 +94,13 @@ type User struct {
 	Color    uint32
 	Bot      bool
 	Raw      *protoTypes.User
+}
+
+// UserProfile contains profile metadata returned separately from User.
+type UserProfile struct {
+	Ref UserRef
+	Bio string
+	Raw *protoUsers.Profile
 }
 
 // Interaction is the protocol's typed interaction update. The current
@@ -179,7 +187,7 @@ func MessageFromProto(value *protoTypes.Message, clients ...*ObjectClient) *Mess
 		client:    firstObjectClient(clients...),
 	}
 	if model.client != nil {
-		model.Author, _ = model.client.Managers().Users.Get(model.AuthorID)
+		model.Author, _ = model.client.managers.Users.Get(model.AuthorID)
 	}
 	return model
 }
@@ -627,7 +635,7 @@ func CommunityMemberFromProto(value *protoTypes.CommunityMember, clients ...*Obj
 		client:      firstObjectClient(clients...),
 	}
 	if model.client != nil {
-		model.User, _ = model.client.Managers().Users.Get(model.ID)
+		model.User, _ = model.client.managers.Users.Get(model.ID)
 	}
 	return model
 }

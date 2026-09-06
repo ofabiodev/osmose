@@ -469,7 +469,7 @@ func (d *eventDispatcher) dispatch(ctx context.Context, update *updates.Update) 
 		member := types.CommunityMemberFromProto(value.CommunityMemberCreated.GetMember(), objectClient)
 		user := types.UserFromProto(value.CommunityMemberCreated.GetUser(), objectClient)
 		if member == nil && objectClient != nil {
-			member = objectClient.Managers().Members.In(types.ID(value.CommunityMemberCreated.GetCommunityId())).Ref(types.ID(value.CommunityMemberCreated.GetMemberId()))
+			member = objectClient.MemberManager().In(types.ID(value.CommunityMemberCreated.GetCommunityId())).Ref(types.ID(value.CommunityMemberCreated.GetMemberId()))
 		}
 		if member != nil {
 			if member.CommunityID == 0 {
@@ -499,7 +499,7 @@ func (d *eventDispatcher) dispatch(ctx context.Context, update *updates.Update) 
 	case *updates.Update_User:
 		event := &UserUpdateEvent{Base: d.base, UserID: types.ID(value.User.GetUserId()), User: types.UserFromProto(value.User.GetUser(), objectClient)}
 		if event.User == nil && objectClient != nil {
-			event.User = objectClient.Managers().Users.Ref(event.UserID)
+			event.User = objectClient.UserManager().Ref(event.UserID)
 		}
 		for _, item := range userUpdate {
 			d.call("user_update", ctx, func(ctx context.Context) error { return item.fn(ctx, event) })
@@ -507,7 +507,7 @@ func (d *eventDispatcher) dispatch(ctx context.Context, update *updates.Update) 
 	case *updates.Update_Community:
 		event := &CommunityUpdateEvent{Base: d.base, CommunityID: types.ID(value.Community.GetCommunityId()), Community: types.CommunityFromProto(value.Community.GetCommunity(), objectClient)}
 		if event.Community == nil && objectClient != nil {
-			event.Community = objectClient.Managers().Communities.Ref(event.CommunityID)
+			event.Community = objectClient.CommunityManager().Ref(event.CommunityID)
 		}
 		for _, item := range communityUpdate {
 			d.call("community_update", ctx, func(ctx context.Context) error { return item.fn(ctx, event) })
@@ -529,7 +529,7 @@ func (d *eventDispatcher) dispatch(ctx context.Context, update *updates.Update) 
 	case *updates.Update_CommunityMember:
 		event := &MemberUpdateEvent{Base: d.base, CommunityID: types.ID(value.CommunityMember.GetCommunityId()), MemberID: types.ID(value.CommunityMember.GetMemberId()), Member: types.CommunityMemberFromProto(value.CommunityMember.GetMember(), objectClient)}
 		if event.Member == nil && objectClient != nil {
-			event.Member = objectClient.Managers().Members.In(event.CommunityID).Ref(event.MemberID)
+			event.Member = objectClient.MemberManager().In(event.CommunityID).Ref(event.MemberID)
 		}
 		if event.Member != nil {
 			if event.Member.ID == 0 {

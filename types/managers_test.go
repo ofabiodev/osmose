@@ -14,6 +14,7 @@ import (
 	protoMessages "github.com/ofabiodev/osmose/proto/messages"
 	protoTypes "github.com/ofabiodev/osmose/proto/types"
 	"github.com/ofabiodev/osmose/proto/updates"
+	protoUsers "github.com/ofabiodev/osmose/proto/users"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -43,7 +44,7 @@ func TestMemberResolveUsesOneTargetedRPCAndFreshFetchBypassesCache(t *testing.T)
 				}
 				return memberResult(10, 20), nil
 			}, CacheConfig{Enabled: enabled})
-			m := c.Managers().Communities.Ref(10).Members()
+			m := c.managers.Communities.Ref(10).Members()
 			if _, ok := m.Get(20); ok || calls != 0 {
 				t.Fatal("Get performed I/O")
 			}
@@ -89,7 +90,7 @@ func TestConcurrentFetchCoalescesAndWaitersCanCancel(t *testing.T) {
 			<-release
 			return memberResult(10, 20), nil
 		}, CacheConfig{Enabled: true})
-		m := c.Managers().Members.In(10)
+		m := c.managers.Members.In(10)
 		var wg sync.WaitGroup
 		for i := 0; i < 16; i++ {
 			wg.Add(1)
@@ -132,7 +133,7 @@ func TestSlowFetchCannotResurrectDeletedMember(t *testing.T) {
 			<-release
 			return memberResult(10, 20), nil
 		}, CacheConfig{Enabled: true})
-		m := c.Managers().Members.In(10)
+		m := c.managers.Members.In(10)
 		done := make(chan struct{})
 		go func() { defer close(done); _, _ = m.Fetch(context.Background(), 20) }()
 		synctest.Wait()
@@ -154,7 +155,7 @@ func TestStateScopesEventsPartialAndHydration(t *testing.T) {
 		}
 		return voidResult(), nil
 	}, CacheConfig{Enabled: true})
-	a, b := c.Managers().Members.In(10), c.Managers().Members.In(11)
+	a, b := c.managers.Members.In(10), c.managers.Members.In(11)
 	c.ApplyUpdate(memberUpdate(10, 20, "first"))
 	c.ApplyUpdate(memberUpdate(11, 20, "other"))
 	snapshot, _ := a.Get(20)
@@ -217,8 +218,8 @@ func TestCoreManagersFetchAndObjectLifecycle(t *testing.T) {
 		}
 	}, CacheConfig{Enabled: true})
 	ctx := context.Background()
-	u := c.Managers().Users.Ref(20)
-	community := c.Managers().Communities.Ref(10)
+	u := c.managers.Users.Ref(20)
+	community := c.managers.Communities.Ref(10)
 	channel := community.Channels().Ref(30)
 	member := community.Members().Ref(20)
 	role := community.Roles().Ref(40)
@@ -255,6 +256,27 @@ func TestCoreManagersFetchAndObjectLifecycle(t *testing.T) {
 	}
 }
 
+func TestUserProfileUsesDirectManagerAndObject(t *testing.T) {
+	calls := 0
+	c := NewObjectClient(func(_ context.Context, request proto.Message) (*core.RPCResult, error) {
+		calls++
+		if profile, ok := request.(*protoUsers.GetProfile); !ok || profile.GetRef().GetUserId() != 12 {
+			t.Fatalf("unexpected request: %v", request)
+		}
+		return &core.RPCResult{Result: &core.RPCResult_Profile{Profile: &protoUsers.Profile{Bio: "hello"}}}, nil
+	})
+
+	profile, err := c.UserManager().Profile(context.Background(), 12)
+	if err != nil || profile.Ref.ID != 12 || profile.Bio != "hello" {
+		t.Fatalf("profile=%+v err=%v", profile, err)
+	}
+	user := c.UserManager().Ref(12)
+	profile, err = user.Profile(context.Background())
+	if err != nil || profile.Ref.ID != 12 || calls != 2 {
+		t.Fatalf("object profile=%+v calls=%d err=%v", profile, calls, err)
+	}
+}
+
 func TestMissingMemberFailsClosedAndFailedMutationPreservesCache(t *testing.T) {
 	reject := errors.New("permission denied")
 	c := NewObjectClient(func(_ context.Context, request proto.Message) (*core.RPCResult, error) {
@@ -263,7 +285,7 @@ func TestMissingMemberFailsClosedAndFailedMutationPreservesCache(t *testing.T) {
 		}
 		return nil, reject
 	}, CacheConfig{Enabled: true})
-	m := c.Managers().Members.In(10)
+	m := c.managers.Members.In(10)
 	if _, err := m.Fetch(context.Background(), 20); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("users sidecar treated as membership: %v", err)
 	}
@@ -277,8 +299,8 @@ func TestMissingMemberFailsClosedAndFailedMutationPreservesCache(t *testing.T) {
 	}
 	for _, run := range []func() error{
 		func() error { _, e := m.Fetch(context.Background(), 0); return e },
-		func() error { _, e := c.Managers().Members.Fetch(context.Background(), 20); return e },
-		func() error { _, e := c.Managers().Messages.Fetch(context.Background(), 50); return e },
+		func() error { _, e := c.managers.Members.Fetch(context.Background(), 20); return e },
+		func() error { _, e := c.managers.Messages.Fetch(context.Background(), 50); return e },
 	} {
 		if err := run(); err == nil {
 			t.Fatal("invalid input accepted")
@@ -291,26 +313,26 @@ func TestUserUpdatesAndRoleInvalidation(t *testing.T) {
 		return &core.RPCResult{Result: &core.RPCResult_CommunityRoles{CommunityRoles: &protoCommunities.CommunityRoles{Roles: []*protoTypes.CommunityRole{{Id: 40, CommunityId: 10, Name: "admin", Permissions: 8}}}}}, nil
 	}, CacheConfig{Enabled: true})
 	ctx := context.Background()
-	if _, err := c.Managers().Roles.In(10).Fetch(ctx, 40); err != nil {
+	if _, err := c.managers.Roles.In(10).Fetch(ctx, 40); err != nil {
 		t.Fatal(err)
 	}
 	c.ApplyUpdate(&updates.Update{Update: &updates.Update_User{User: &updates.UpdateUser{UserId: 20, User: &protoTypes.User{Id: 20, Name: "before"}}}})
-	before, _ := c.Managers().Users.Get(20)
+	before, _ := c.managers.Users.Get(20)
 	c.ApplyUpdate(&updates.Update{Update: &updates.Update_UserStatusBatch{UserStatusBatch: &updates.UpdateUserStatusBatch{Updates: []*updates.UpdateUserStatus{{UserId: 20, Status: &protoTypes.UserStatus{Status: protoTypes.UserStatus_ONLINE.Enum()}}}}}})
-	after, _ := c.Managers().Users.Get(20)
+	after, _ := c.managers.Users.Get(20)
 	if after.Name != "before" || after.Status == nil || before.Status != nil {
 		t.Fatal("presence update discarded identity or mutated a snapshot")
 	}
 	c.ApplyUpdate(&updates.Update{Update: &updates.Update_Community{Community: &updates.UpdateCommunity{CommunityId: 10, Community: &protoTypes.Community{Id: 10, Name: "changed"}}}})
-	if _, ok := c.Managers().Roles.In(10).Get(40); ok {
+	if _, ok := c.managers.Roles.In(10).Get(40); ok {
 		t.Fatal("community update retained potentially stale roles")
 	}
-	community, ok := c.Managers().Communities.Get(10)
+	community, ok := c.managers.Communities.Get(10)
 	if !ok || community.Name != "changed" {
 		t.Fatal("community update not applied")
 	}
 	c.ApplyUpdate(&updates.Update{Update: &updates.Update_User{User: &updates.UpdateUser{UserId: 20}}})
-	if _, ok := c.Managers().Users.Get(20); ok {
+	if _, ok := c.managers.Users.Get(20); ok {
 		t.Fatal("ID-only update retained stale user")
 	}
 }
@@ -327,7 +349,7 @@ func TestConcurrentGatewayReadsAreIsolated(t *testing.T) {
 			defer wg.Done()
 			for n := 0; n < 100; n++ {
 				c.ApplyUpdate(memberUpdate(10, 20, "member"))
-				m, ok := c.Managers().Members.In(10).Get(20)
+				m, ok := c.managers.Members.In(10).Get(20)
 				if !ok || m.RoleIDs[0] != 40 {
 					t.Error("corrupted concurrent snapshot")
 					return
@@ -365,7 +387,7 @@ func BenchmarkMemberLookup(b *testing.B) {
 				}
 				return memberResult(10, 20), nil
 			}, CacheConfig{Enabled: mode == "cached-resolve"})
-			m := c.Managers().Members.In(10)
+			m := c.managers.Members.In(10)
 			if mode == "cached-resolve" {
 				_, _ = m.Fetch(context.Background(), 20)
 				calls = 0

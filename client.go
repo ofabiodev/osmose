@@ -15,7 +15,6 @@ import (
 type Client = coreclient.Client
 type Config = coreclient.Config
 type CacheConfig = types.CacheConfig
-type Managers = types.Managers
 type UserManager = types.UserManager
 type CommunityManager = types.CommunityManager
 type ChannelManager = types.ChannelManager

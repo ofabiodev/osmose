@@ -44,14 +44,14 @@ func TestGatewayStateAppliedEvenWhenEventQueueDrops(t *testing.T) {
 		frame, _ := proto.Marshal(&core.ServerMessage{Message: &core.ServerMessage_Update{Update: update}})
 		c.handleFrame(active, frame)
 	}
-	message, ok := c.Managers.Messages.In(types.ChannelChat(10, 20)).Get(30)
+	message, ok := c.Messages.In(types.ChannelChat(10, 20)).Get(30)
 	if !ok || message.Content != "edited" || c.DroppedEvents() != 1 {
 		t.Fatalf("state=%+v dropped=%d", message, c.DroppedEvents())
 	}
 	deletion := &updates.Update{Update: &updates.Update_ChannelDeleted{ChannelDeleted: &updates.UpdateChannelDeleted{Channel: ref.GetChannel()}}}
 	frame, _ := proto.Marshal(&core.ServerMessage{Message: &core.ServerMessage_Update{Update: deletion}})
 	c.handleFrame(active, frame)
-	if _, ok := c.Managers.Messages.In(types.ChannelChat(10, 20)).Get(30); ok {
+	if _, ok := c.Messages.In(types.ChannelChat(10, 20)).Get(30); ok {
 		t.Fatal("deleted channel retained messages")
 	}
 }
@@ -66,11 +66,11 @@ func TestManagerRawAndRichHandlersShareState(t *testing.T) {
 	cancel, runErr := startReadyClient(t, c)
 	defer stopTestClient(t, c, cancel, runErr)
 	chat := types.ChannelChat(10, 20)
-	sent, err := c.Managers.Messages.In(chat).Create(context.Background(), "modern")
+	sent, err := c.Messages.In(chat).Create(context.Background(), "modern")
 	if err != nil {
 		t.Fatal(err)
 	}
-	cached, ok := c.Managers.Messages.In(chat).Get(sent.ID)
+	cached, ok := c.Messages.In(chat).Get(sent.ID)
 	if !ok || !cached.Partial || cached.Content != "modern" {
 		t.Fatal("message manager did not populate shared cache")
 	}
@@ -97,7 +97,7 @@ func TestManagerRawAndRichHandlersShareState(t *testing.T) {
 		if message.Author == nil || message.Author.ID != 77 || message.Channel() == nil {
 			t.Error("missing bound related objects")
 		}
-		current, ok := c.Managers.Messages.In(chat).Get(message.ID)
+		current, ok := c.Messages.In(chat).Get(message.ID)
 		if !ok || current.Partial || current.Content != "full" {
 			t.Error("handler ran before state was synchronized")
 		}
@@ -113,8 +113,8 @@ func TestManagerRawAndRichHandlersShareState(t *testing.T) {
 	if called {
 		t.Fatal("rich handler unsubscribe failed")
 	}
-	c.Managers.Clear()
-	if _, ok := c.Managers.Messages.In(chat).Get(sent.ID); ok {
+	c.ClearCache()
+	if _, ok := c.Messages.In(chat).Get(sent.ID); ok {
 		t.Fatal("clear retained state")
 	}
 }

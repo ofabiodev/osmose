@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -175,7 +176,7 @@ func TestClientInitializesAuthorizesAndReplies(t *testing.T) {
 	socket := newScriptedSocket()
 	client := testClient(t, socket)
 	cancel, runErr := startReadyClient(t, client)
-	message := client.Managers.Messages.In(modelTypes.SelfChat()).Ref(1)
+	message := client.Messages.In(modelTypes.SelfChat()).Ref(1)
 	chat, err := message.Chat.ToProto()
 	if err != nil {
 		t.Fatal(err)
@@ -271,7 +272,7 @@ func TestClientRequestTimeoutRemovesPending(t *testing.T) {
 	socket.mu.Unlock()
 	ctx, timeout := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer timeout()
-	_, err := client.Managers.Communities.List(ctx)
+	_, err := client.Communities.List(ctx)
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("unexpected timeout error: %v", err)
 	}
@@ -291,7 +292,7 @@ func TestClientConvertsRPCError(t *testing.T) {
 	socket.mu.Lock()
 	socket.rpcErr = true
 	socket.mu.Unlock()
-	_, err := client.Managers.Communities.List(context.Background())
+	_, err := client.Communities.List(context.Background())
 	var rpcErr *RPCError
 	if !errors.As(err, &rpcErr) || rpcErr.Code != 403 || rpcErr.Message != "forbidden" {
 		t.Fatalf("unexpected RPC error: %v", err)
@@ -333,6 +334,12 @@ func TestClientReturnsPermanentAuthorizationError(t *testing.T) {
 	}
 	if attempts != 1 {
 		t.Fatalf("permanent error triggered reconnects: %d attempts", attempts)
+	}
+}
+
+func TestUnauthorizedAuthorizationErrorIsPermanent(t *testing.T) {
+	if !isPermanentAuthorizationError(&RPCError{Message: "Unauthorized"}) {
+		t.Fatal("Unauthorized authorization errors must not be retried")
 	}
 }
 
@@ -397,6 +404,42 @@ func TestClientReconnectsAfterConnectionFailure(t *testing.T) {
 	cancel, runErr := startReadyClient(t, client)
 	if attempts < 2 {
 		t.Fatalf("client did not reconnect, attempts=%d", attempts)
+	}
+	stopTestClient(t, client, cancel, runErr)
+}
+
+func TestClientReconnectsAfterReadyConnectionFailure(t *testing.T) {
+	first := newScriptedSocket()
+	second := newScriptedSocket()
+	var attempts atomic.Int32
+	client, err := New(Config{
+		Token:             "token",
+		ClientID:          120715,
+		ServerURL:         "ws://localhost",
+		RequestTimeout:    50 * time.Millisecond,
+		HeartbeatInterval: time.Millisecond,
+		StableConnection:  time.Hour,
+		BackoffMin:        time.Millisecond,
+		BackoffMax:        2 * time.Millisecond,
+		dial: func(context.Context, string) (gateway.Socket, error) {
+			if attempts.Add(1) == 1 {
+				return first, nil
+			}
+			return second, nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancel, runErr := startReadyClient(t, client)
+	first.Close()
+
+	deadline := time.Now().Add(time.Second)
+	for (attempts.Load() < 2 || client.State() != Ready) && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if attempts.Load() < 2 || client.State() != Ready {
+		t.Fatalf("client did not reconnect after ready connection failure: attempts=%d state=%s", attempts.Load(), client.State())
 	}
 	stopTestClient(t, client, cancel, runErr)
 }
