@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -133,6 +134,28 @@ func TestKeepaliveSendsProtocolMessage(t *testing.T) {
 	writes, _ := socket.snapshot()
 	if writes == 0 {
 		t.Fatal("keepalive did not enqueue a protocol message")
+	}
+}
+
+func TestKeepaliveStopsAfterConnectionCloses(t *testing.T) {
+	var calls atomic.Int32
+	firstCall := make(chan struct{})
+	keepalive := NewKeepalive(context.Background(), time.Millisecond, func(context.Context, Frame) error {
+		if calls.Add(1) == 1 {
+			close(firstCall)
+		}
+		return ErrClosed
+	}, Frame{}, nil)
+	keepalive.Start()
+	select {
+	case <-firstCall:
+	case <-time.After(time.Second):
+		t.Fatal("keepalive did not enqueue")
+	}
+	time.Sleep(10 * time.Millisecond)
+	keepalive.Stop()
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("keepalive continued after connection close: %d calls", got)
 	}
 }
 
