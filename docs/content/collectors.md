@@ -116,7 +116,7 @@ A form can be composed from `AwaitMessage` calls:
 
 ```go
 func ask(ctx context.Context, client *osmose.Client, chat types.ChatRef, userID types.ID, prompt string) (string, error) {
-	if _, err := client.Managers.Messages.In(chat).Create(ctx, prompt); err != nil {
+	if _, err := client.Messages.In(chat).Create(ctx, prompt); err != nil {
 		return "", err
 	}
 

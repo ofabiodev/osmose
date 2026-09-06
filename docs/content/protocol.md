@@ -45,8 +45,8 @@ expected handshake shape are returned as permanent errors. Check them with
 
 ## Raw requests
 
-High-level services are preferred for normal bot code. Advanced users can use
-the generated protocol packages directly:
+High-level managers, rich objects, and specialized services are preferred for
+normal bot code. Advanced users can use the generated protocol packages directly:
 
 ```go
 import protoCommunities "github.com/ofabiodev/osmose/proto/communities"

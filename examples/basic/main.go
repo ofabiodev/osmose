@@ -25,7 +25,7 @@ func main() {
 	// after demonstrating the manager and object APIs.
 	client.OnReady(func(ctx context.Context, event *osmose.ReadyEvent) error {
 		defer client.Close()
-		messages := client.Managers.Messages.In(types.SelfChat())
+		messages := client.Messages.In(types.SelfChat())
 		sent, err := messages.Create(ctx, "Hello from Osmose")
 		if err != nil {
 			return err
@@ -38,7 +38,7 @@ func main() {
 		}
 		log.Printf("received %d messages", len(history.Messages))
 
-		user, err := client.Managers.Users.Fetch(ctx, event.User.ID)
+		user, err := client.Users.Fetch(ctx, event.User.ID)
 		if err != nil {
 			return err
 		}

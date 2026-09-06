@@ -11,7 +11,7 @@ Osmose is a small, typed Go SDK for bots that speak the real Osmium protocol.
 
 It keeps WebSocket frames, binary protobuf messages, request correlation,
 keepalive, reconnect, and shutdown inside the client while keeping bot code
-focused on events and services.
+focused on events, rich objects, managers, and specialized services.
 
 ## Start here
 

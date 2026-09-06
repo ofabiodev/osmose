@@ -20,18 +20,20 @@ client, err := osmose.New(osmose.Config{
 })
 ```
 
-`New` validates the configuration and applies defaults. `Client` exposes these
-services:
+`New` validates the configuration and applies defaults. `Client` exposes entity
+managers directly, plus specialized services for protocol areas without a
+dedicated manager:
 
 | Field | Package | Main operations |
 | --- | --- | --- |
-| `Messages` | `messages` | `Send`, `Reply`, `History`, `Search`, `PinnedMessages`, `UnreadMentions`, `Edit`, `Delete` |
+| `Users` | `types` | `Get`, `Resolve`, `Fetch`, `Lookup`, `Profile`, `List` |
+| `Communities` | `types` | `Get`, `Resolve`, `Fetch`, `List`, `Create`, `Edit`, `Delete` |
+| `Channels` | `types` | Scoped `Get`, `Resolve`, `Fetch`, `List`, `Create`, `Edit`, `Delete` |
+| `Members` | `types` | Scoped `Get`, `Resolve`, `Fetch`, `FetchMany`, `List`, `Create`, `Edit`, `Delete` |
+| `Roles` | `types` | Scoped `Get`, `Resolve`, `Fetch`, `List`, `Create`, `Edit`, `Delete` |
+| `Messages` | `types` | Scoped `Get`, `Resolve`, `Fetch`, `List`, `Create`, `Search`, `PinnedMessages`, `UnreadMentions`, `Edit`, `Delete` |
 | `Chats` | `chats` | `List`, `Get`, `Members`, `SetTyping` |
-| `Communities` | `communities` | `List`, `Channels`, `ChannelMembers` |
-| `Users` | `users` | `Get`, `Profile` |
-| `Reactions` | `reactions` | `Add`, `Remove` |
 | `Voice` | `voice` | `RequestRoom`, `RoomStates`, `DisconnectUser` |
-| `Managers` | `types` (also aliased from `osmose`) | `Users`, `Communities`, `Channels`, `Members`, `Roles`, `Messages`, `Clear` |
 
 ## Lifecycle
 
@@ -88,7 +90,7 @@ Registration returns a function that removes that handler.
 | `OnVoiceRoomParticipant` | `VoiceRoomParticipantEvent` |
 | `OnUpdate` | `UpdateEvent` with the raw generated update |
 
-Message create and interaction events provide a `Reply(ctx, content)` helper.
+Message objects and interaction events provide a `Reply(ctx, content)` helper.
 Interaction events also provide `Respond`, `Acknowledge`, and `Defer`. Every
 event provides `Client()`. `ConnectionEvent` contains `Attempt`, `State`,
 `RetryIn`, and `Err`.
@@ -138,6 +140,7 @@ The `types` package contains small models shared by events and services:
 | --- | --- |
 | `types.ID` | Osmium wire ID with an explicit `Uint64()` conversion. |
 | `types.User` | User identity, username, status, photo, bot flag, and raw value. |
+| `types.UserProfile` | Separate profile metadata such as a user's bio. |
 | `types.Message` | Message ID, chat, author, content, `ReplyInfo`, media, entities, bot info, and raw value. |
 | `types.ChatRef` | Self, user, group, or community channel reference. |
 | `types.ChannelRef` | Community channel reference. |
@@ -177,7 +180,7 @@ access to advanced protocol fields when needed.
 
 `Community`, `Channel`, `Message`, `CommunityMember` (also named `Member`), and
 `CommunityRole` (also named `Role`) can perform common operations directly.
-Objects returned by `Communities`, `Chats`, `Messages`, and typed events are
+Objects returned by managers, `Chats`, and typed events are
 bound to the client automatically. Their methods accept `context.Context` and
 hide request construction; use `Raw` for unsupported protocol operations.
 
@@ -186,7 +189,8 @@ hide request construction; use `Raw` for unsupported protocol operations.
 
 ## Managers and partial objects
 
-`Client.Managers` provides `UserManager`, `CommunityManager`, `ChannelManager`,
+`Client` exposes `Users`, `Communities`, `Channels`, `Members`, `Roles`, and
+`Messages` directly as `UserManager`, `CommunityManager`, `ChannelManager`,
 `MemberManager`, `RoleManager`, and `MessageManager`. Use `In(communityID)` for
 channels/members/roles and `In(chatRef)` for messages. Rich objects expose their
 scoped managers through `community.Channels()`, `community.Members()`,
@@ -242,7 +246,7 @@ if errors.As(err, &rpcErr) {
 
 ## Raw API
 
-When a high-level service does not cover an endpoint, call it with a generated
+When the high-level API does not cover an endpoint, call it with a generated
 protobuf request:
 
 ```go
@@ -256,7 +260,8 @@ if err != nil {
 communities := result.GetCommunities()
 ```
 
-The raw API is intentionally separate from the common service API. Request
+The raw API is intentionally separate from the common managers, objects, and
+specialized services. Request
 wrapping is generated and runtime dispatch does not use reflection.
 
 ## Configuration

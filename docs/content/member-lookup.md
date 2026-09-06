@@ -29,10 +29,10 @@ database work, and handler queueing need measurements from a real command run.
 Enable `Config.Cache.Enabled`, then replace repeated membership RPCs with:
 
 ```go
-community := client.Managers.Communities.Ref(communityID)
+community := client.Communities.Ref(communityID)
 member, err := community.Members().Resolve(ctx, mentionedUserID)
 if err != nil {
-    return err
+	return err
 }
 _, err = member.SendText(ctx, "Hello")
 return err

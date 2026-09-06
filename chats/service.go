@@ -142,7 +142,7 @@ func (s *Service) Get(ctx context.Context, ref types.ChatRef) (*Chat, error) {
 }
 
 // Members returns members for private or group chats. For a community
-// channel, use communities.Service.ChannelMembers instead.
+// channel, use the channel object's Members method instead.
 func (s *Service) Members(ctx context.Context, ref types.ChatRef) (*Members, error) {
 	chat, err := ref.ToProto()
 	if err != nil {

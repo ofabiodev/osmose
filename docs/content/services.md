@@ -9,23 +9,23 @@ layout: doc
 Services accept `context.Context` and small parameter structs.
 
 Managers and rich objects are the primary API for stateful community and message
-operations. These services remain for protocol areas that do not have a dedicated
-manager yet, such as chat operations, message search, reactions, and voice.
+operations. Specialized services remain for protocol areas without a dedicated
+manager, such as chat operations and voice.
 For cache lookups and scoped managers, see [managers and state](../state-management/).
 
 ## Messages
 
 ```go
-sent, err := client.Managers.Messages.In(types.SelfChat()).Create(ctx, "Hello from Osmose")
+sent, err := client.Messages.In(types.SelfChat()).Create(ctx, "Hello from Osmose")
 if err != nil {
 	return err
 }
 
-history, err := client.Managers.Messages.In(types.SelfChat()).List(ctx, types.MessageHistoryParams{
+history, err := client.Messages.In(types.SelfChat()).List(ctx, types.MessageHistoryParams{
 	Limit: 50,
 })
 
-matches, err := client.Managers.Channels.In(communityID).Ref(channelID).Search(ctx, types.MessageSearchParams{
+matches, err := client.Channels.In(communityID).Ref(channelID).Search(ctx, types.MessageSearchParams{
 	Query: "release",
 })
 ```
@@ -34,26 +34,27 @@ matches, err := client.Managers.Channels.In(communityID).Ref(channelID).Search(c
 bot identity, and buttons:
 
 ```go
-_, err := client.Managers.Messages.In(types.SelfChat()).CreateWith(ctx, types.MessageSendParams{
+_, err := client.Messages.In(types.SelfChat()).CreateWith(ctx, types.MessageSendParams{
 	Content: "Choose:",
 	BotInfo: &types.MessageBotInfo{Buttons: types.MessageButtons{{
-		messages.LinkButton("Website", "https://osmium.chat"),
-		messages.InteractionButton("Continue", "continue"),
+		{Label: "Website", URL: "https://osmium.chat"},
+		{Label: "Continue", Interaction: "continue"},
 	}}},
 })
 ```
 
-Available message operations are `Send`, `Reply`, `History`, `Search`,
-`PinnedMessages`, `UnreadMentions`, `Edit`, and `Delete`.
+Available manager operations are `Create`, `CreateWith`, `List`, `Search`,
+`PinnedMessages`, `UnreadMentions`, `Edit`, and `Delete`. Rich message objects
+also provide `Send`, `Reply`, `Edit`, `Delete`, and reaction/pin operations.
 
 ## Chats and communities
 
 ```go
 chat, err := client.Chats.Get(ctx, types.UserChat(userID))
 members, err := client.Chats.Members(ctx, types.GroupChat(groupID))
-communities, err := client.Managers.Communities.List(ctx)
-channels, err := client.Managers.Communities.Ref(communityID).Channels().List(ctx)
-channelMembers, err := client.Managers.Channels.In(communityID).Ref(channelID).Members(ctx)
+communities, err := client.Communities.List(ctx)
+channels, err := client.Communities.Ref(communityID).Channels().List(ctx)
+channelMembers, err := client.Channels.In(communityID).Ref(channelID).Members(ctx)
 ```
 
 `Chats.Members` is for private or group chats. Use the channel object's
@@ -78,11 +79,11 @@ types.ChannelChat(communityID, channelID)
 
 ## Rich objects
 
-Community and message models returned by services keep their client reference,
+Community and message models returned by managers keep their client reference,
 so common operations can be called directly:
 
 ```go
-list, err := client.Managers.Communities.List(ctx)
+list, err := client.Communities.List(ctx)
 if err != nil {
 	return err
 }
@@ -121,14 +122,11 @@ is now the reply operation. The original protobuf message remains available in
 ## Users and reactions
 
 ```go
-user, err := client.Managers.Users.Lookup(ctx, "some-user")
-profile, err := client.Users.Profile(ctx, types.UserRef{ID: userID})
+user, err := client.Users.Lookup(ctx, "some-user")
+profile, err := user.Profile(ctx)
 
-err = client.Reactions.Add(ctx, reactions.Params{
-	Chat:      types.SelfChat(),
-	MessageID: messageID,
-	Emoji:     reactions.Emoji{Unicode: "👍"},
-})
+message, err := client.Messages.In(types.SelfChat()).Fetch(ctx, messageID)
+err = message.React(ctx, types.Emoji{Unicode: "👍"})
 ```
 
 ## Voice control plane

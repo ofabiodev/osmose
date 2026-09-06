@@ -82,13 +82,13 @@ Legend:
 
 | Area          | Status | Details                                                                                           |
 | ------------- | :----: | ------------------------------------------------------------------------------------------------- |
-| Client        |    ✅   | Central client, configuration, lifecycle, typed services                                          |
+| Client        |    ✅   | Central client, configuration, lifecycle, direct entity managers                                 |
 | Gateway       |    ✅   | Binary protobuf WebSocket, keepalive, reconnect handling                                          |
 | Lifecycle     |    ✅   | Connect, initialize, authorize, ready, reconnect, shutdown                                        |
 | RPC           |    ✅   | Request correlation, context cancellation, timeouts, typed errors                                 |
 | Events        |   🟡   | Typed and direct message callbacks; gateway state synchronization. The protocol has no role events |
 | Collectors    |    ✅   | Message, interaction, and reaction collectors with filters and time limits                        |
-| Messages      |   🟡   | Service and rich-object message operations. High-level media upload/download is still missing      |
+| Messages      |   🟡   | Manager and rich-object message operations. High-level media upload/download is still missing      |
 | Chats         |   🟡   | Fetching and members support. Chat management operations are not wrapped yet                      |
 | Communities   |   🟡   | Rich community, channel, member, and role operations. Settings and channel overrides remain       |
 | Users         |    ✅   | User fetching and profile access                                                                  |
@@ -98,7 +98,7 @@ Legend:
 | Interactions  |   🟡   | Basic interaction events and responses. Advanced components are missing                           |
 | Models        |    ✅   | Client-bound rich objects, partial references, explicit Fetch, and isolated snapshots with Raw     |
 | Cache         |    ✅   | Optional bounded LRU caches, TTL, invalidation, reconnect clearing, and concurrent read coalescing |
-| Managers      |    ✅   | User, community, channel, member, role, and message managers with scoped accessors                 |
+| Managers      |    ✅   | Direct user, community, channel, member, role, and message managers with scoped accessors         |
 | Permissions   |   🟡   | Role and default-permission operations are wrapped; channel overrides remain available through Raw |
 | Builders      |    ⚪   | Message and component builders are planned                                                        |
 | Raw API       |    ✅   | Full protobuf escape hatch for unsupported operations                                             |
@@ -173,8 +173,8 @@ reconnect, and shutdown for the client.
 Handlers are strongly typed, return an error, and can be removed:
 
 ```go
-	remove := client.OnMessageEdit(func(_ context.Context, message *types.Message) error {
-		log.Printf("message %d changed", message.ID)
+remove := client.OnMessageEdit(func(_ context.Context, message *types.Message) error {
+	log.Printf("message %d changed", message.ID)
 	return nil
 })
 defer remove()
@@ -209,8 +209,8 @@ if err != nil {
 	return err
 }
 
-	_, err := event.Reply(ctx, "Recebi: "+event.Content)
-	return err
+_, err = event.Reply(ctx, "Recebi: "+event.Content)
+return err
 ```
 
 Use `CollectMessages` when more than one matching message is needed. Message,
@@ -226,7 +226,7 @@ Use manager methods for common message operations:
 ```go
 import "github.com/ofabiodev/osmose/types"
 
-sent, err := client.Managers.Messages.In(types.SelfChat()).Create(ctx, "Choose an action:")
+sent, err := client.Messages.In(types.SelfChat()).Create(ctx, "Choose an action:")
 if err != nil {
 	return err
 }
@@ -246,12 +246,12 @@ Common chat references are `types.SelfChat()`, `types.UserChat(id)`,
 
 ## Rich objects
 
-Models returned by the community, chat, message, and event APIs keep a private
+Models returned by managers, chats, messages, and events keep a private
 reference to the client, so common operations can be written directly on the
 object:
 
 ```go
-communities, err := client.Managers.Communities.List(ctx)
+communities, err := client.Communities.List(ctx)
 if err != nil {
 	return err
 }
@@ -282,7 +282,7 @@ Enable shared state with `Cache: osmose.CacheConfig{Enabled: true}` in the clien
 configuration. Managers also work with caching disabled.
 
 ```go
-community := client.Managers.Communities.Ref(communityID) // No RPC.
+community := client.Communities.Ref(communityID) // No RPC.
 members := community.Members()
 
 member, err := members.Resolve(ctx, userID) // Cache hit or one targeted RPC.
@@ -308,27 +308,26 @@ See [managers and cache behavior](docs/content/state-management.md),
 [member lookup performance](docs/content/member-lookup.md), and the
 [stateful example](examples/stateful/main.go).
 
-## Services
+## Specialized services
 
-| Service       | Operations                                                                                 |
-| ------------- | ------------------------------------------------------------------------------------------ |
-| `Messages`    | `Send`, `Reply`, `History`, `Search`, `PinnedMessages`, `UnreadMentions`, `Edit`, `Delete` |
-| `Chats`       | `List`, `Get`, `Members`, `SetTyping`                                                      |
-| `Communities` | `List`, `Channels`, `ChannelMembers`                                                       |
-| `Users`       | `Get`, `Profile`                                                                           |
-| `Reactions`   | `Add`, `Remove`                                                                            |
-| `Voice`       | `RequestRoom`, `RoomStates`, `DisconnectUser`                                              |
+| Service | Operations |
+| ------- | ---------- |
+| `Chats` | `List`, `Get`, `Members`, `SetTyping` |
+| `Voice` | `RequestRoom`, `RoomStates`, `DisconnectUser` |
 
-Every network operation accepts `context.Context`.
+Entity operations are available through the direct managers above. Every
+network operation accepts `context.Context`.
 
 ## Models
 
-The `types` package contains the public models shared by services and events:
+The `types` package contains the public models shared by managers, objects,
+specialized services, and events:
 
 | Type                                              | Use                                                                  |
 | ------------------------------------------------- | -------------------------------------------------------------------- |
 | `types.ID`                                        | Explicit Osmium identifier type                                      |
 | `types.User`                                      | User identity, status, photo, and bot information                    |
+| `types.UserProfile`                               | Separate profile metadata such as a user's bio                       |
 | `types.Message`                                   | Message content, author, chat, reply metadata, media, entities, and bot info |
 | `types.ChatRef`                                   | Self, user, group, or community channel reference                    |
 | `types.Conversation`                              | Chat state and read markers                                          |
@@ -391,7 +390,7 @@ Zero values use sensible defaults.
 
 ## Advanced / raw API
 
-When a service does not cover an endpoint, use a generated protocol request:
+When the high-level API does not cover an endpoint, use a generated protocol request:
 
 ```go
 import protoCommunities "github.com/ofabiodev/osmose/proto/communities"
@@ -405,7 +404,7 @@ communities := result.GetCommunities()
 ```
 
 The generated protocol packages are included in the module and the raw API is
-kept separate from the common service API.
+kept separate from the common managers, objects, and specialized services.
 
 ## Protocol
 

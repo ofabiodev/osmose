@@ -14,14 +14,14 @@ separate community fetch just to construct a member or channel reference.
 
 ```go
 client, err := osmose.New(osmose.Config{
-    Token: token,
-    ClientID: clientID,
-    Cache: osmose.CacheConfig{
-        Enabled: true,
-        TTL: 5 * time.Minute,
-        Members: 4096,
-        Messages: 2048,
-    },
+	Token: token,
+	ClientID: clientID,
+	Cache: osmose.CacheConfig{
+		Enabled: true,
+		TTL: 5 * time.Minute,
+		Members: 4096,
+		Messages: 2048,
+	},
 })
 ```
 
@@ -47,7 +47,7 @@ entries cannot be returned. Entry counts bound retention, not an exact byte size
 ## Get, Resolve, and Fetch
 
 ```go
-members := client.Managers.Members.In(communityID)
+members := client.Members.In(communityID)
 
 member, found := members.Get(userID)       // Cache only; no context or RPC.
 member, err := members.Resolve(ctx, userID) // Complete cache hit, otherwise one RPC.
@@ -68,7 +68,7 @@ Completed calls are removed immediately, so later `Fetch` calls are fresh.
 ## Scoped managers
 
 ```go
-community := client.Managers.Communities.Ref(communityID)
+community := client.Communities.Ref(communityID)
 channel := community.Channels().Ref(channelID)
 
 member, err := community.Members().Resolve(ctx, userID)
@@ -82,12 +82,12 @@ and ID; messages are keyed by chat and ID. Entries cannot leak between scopes.
 
 | Manager | Access | Operations |
 | --- | --- | --- |
-| `UserManager` | `client.Managers.Users` | `Get`, `Resolve`, `Fetch`, `Lookup(ctx, username)`, `List()` (cached users only) |
-| `CommunityManager` | `client.Managers.Communities` | `Get`, `Resolve`, `Fetch`, `List(ctx)`, `Create(ctx, name)`, `Edit(ctx, id, options)`, `Delete(ctx, id)` |
-| `ChannelManager` | `client.Managers.Channels.In(communityID)` | `Get`, `Resolve`, `Fetch`, `List(ctx)`, `Create(ctx, options)`, `Edit(ctx, id, options)`, `Delete(ctx, id)` |
-| `MemberManager` | `client.Managers.Members.In(communityID)` | `Get`, `Resolve`, `Fetch`, `FetchMany(ctx, ids...)`, `List(ctx)`, `Create(ctx, userID)`, `Edit(ctx, id, options)`, `Delete(ctx, id)` |
-| `RoleManager` | `client.Managers.Roles.In(communityID)` | `Get`, `Resolve`, `Fetch`, `List(ctx)`, `Create(ctx, options)`, `Edit(ctx, id, options)`, `Delete(ctx, id)` |
-| `MessageManager` | `client.Managers.Messages.In(chatRef)` | `Get`, `Resolve`, `Fetch`, `List(ctx, historyParams...)`, `Create(ctx, content)`, `CreateWith(ctx, params)`, `Edit(ctx, id, content)`, `Delete(ctx, id)` |
+| `UserManager` | `client.Users` | `Get`, `Resolve`, `Fetch`, `Lookup(ctx, username)`, `Profile(ctx, id)`, `List()` (cached users only) |
+| `CommunityManager` | `client.Communities` | `Get`, `Resolve`, `Fetch`, `List(ctx)`, `Create(ctx, name)`, `Edit(ctx, id, options)`, `Delete(ctx, id)` |
+| `ChannelManager` | `client.Channels.In(communityID)` | `Get`, `Resolve`, `Fetch`, `List(ctx)`, `Create(ctx, options)`, `Edit(ctx, id, options)`, `Delete(ctx, id)` |
+| `MemberManager` | `client.Members.In(communityID)` | `Get`, `Resolve`, `Fetch`, `FetchMany(ctx, ids...)`, `List(ctx)`, `Create(ctx, userID)`, `Edit(ctx, id, options)`, `Delete(ctx, id)` |
+| `RoleManager` | `client.Roles.In(communityID)` | `Get`, `Resolve`, `Fetch`, `List(ctx)`, `Create(ctx, options)`, `Edit(ctx, id, options)`, `Delete(ctx, id)` |
+| `MessageManager` | `client.Messages.In(chatRef)` | `Get`, `Resolve`, `Fetch`, `List(ctx, historyParams...)`, `Search`, `PinnedMessages`, `UnreadMentions`, `Create(ctx, content)`, `CreateWith(ctx, params)`, `Edit(ctx, id, content)`, `Delete(ctx, id)` |
 
 Every manager also has `Ref`, `ListCached`, `Invalidate(id)`, and `Clear()`.
 `ListCached` returns only retained entries, sorted by ID. It never means "all
@@ -121,13 +121,13 @@ arbitrary user accounts. These operations are intentionally absent from UserMana
 ## Object lifecycle and partial data
 
 ```go
-channel := client.Managers.Channels.In(communityID).Ref(channelID)
+channel := client.Channels.In(communityID).Ref(channelID)
 sent, err := channel.SendText(ctx, "Hello") // IDs suffice; no channel fetch needed.
 if err != nil {
-    return err
+	return err
 }
 if err := sent.Fetch(ctx); err != nil {    // Refreshes this snapshot in place.
-    return err
+	return err
 }
 return sent.Pin(ctx)
 ```
@@ -200,7 +200,7 @@ remain usable, but fetch new permission data after reconnect.
 ```go
 community.Members().Invalidate(userID) // Cache eviction only.
 community.Roles().Clear()               // This community's roles.
-client.Managers.Clear()                            // All cached entities.
+client.ClearCache()                                // All cached entities.
 ```
 
 The v0.3 surface uses rich handlers and scoped managers as its single public path.
